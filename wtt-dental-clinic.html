@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>คลินิกทันตกรรม วอทเดอะทูธ</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F6F6F9; --bg2: #EEEDF3; --surface: #FFFFFF;
+  --border: #E3E1EA; --border2: #D1CEDC;
+  --text: #201C2B; --text2: #6C6878; --text3: #A29EAF;
+  --green: #4C2E8C; --green2: #372169; --green-light: #F1ECFB;
+  --purple: #4C2E8C; --purple2: #372169; --purple-light: #F1ECFB;
+  --red: #B23434; --red-light: #FCEBEB;
+  --branch1: #1A5276; --branch1-light: #D6EAF8;
+  --branch2: #1D6A4C; --branch2-light: #D5F5E3;
+  --radius: 14px; --radius-sm: 9px;
+  --shadow: 0 1px 2px rgba(32,20,60,0.05), 0 1px 1px rgba(32,20,60,0.04);
+  --shadow-md: 0 10px 28px rgba(32,20,60,0.10), 0 2px 6px rgba(32,20,60,0.05);
+}
+body { font-family: 'Sarabun','Noto Sans Thai',sans-serif; background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+.hidden { display: none !important; }
+
+/* LOGIN */
+.login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); padding: 1rem; }
+.login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 2.25rem 2rem; width: 100%; max-width: 400px; box-shadow: var(--shadow-md); }
+.login-brand { text-align: center; margin-bottom: 1.5rem; }
+.login-icon { width: 56px; height: 56px; background: var(--purple-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+.login-icon i { font-size: 28px; color: var(--purple); }
+.login-name { font-size: 17px; font-weight: 700; color: var(--text); }
+.login-sub { font-size: 12px; color: var(--text2); margin-top: 3px; }
+
+/* BRANCH SELECT */
+.branch-section { margin-bottom: 18px; }
+.branch-label { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 8px; letter-spacing: 0.3px; display: block; }
+.branch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.branch-btn { border: 2px solid var(--border); border-radius: 10px; padding: 14px 10px; cursor: pointer; background: var(--bg); transition: all 0.15s; text-align: center; font-family: inherit; }
+.branch-btn:hover { border-color: var(--purple); background: var(--purple-light); }
+.branch-btn.selected { border-color: var(--purple); background: var(--purple-light); }
+.branch-btn .b-icon { font-size: 22px; margin-bottom: 5px; }
+.branch-btn .b-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.branch-btn .b-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.branch-btn.selected .b-name { color: var(--purple); }
+.branch-btn[data-branch="branch1"]:hover,.branch-btn[data-branch="branch1"].selected { border-color: var(--branch1); background: var(--branch1-light); }
+.branch-btn[data-branch="branch1"].selected .b-name { color: var(--branch1); }
+.branch-btn[data-branch="branch2"]:hover,.branch-btn[data-branch="branch2"].selected { border-color: var(--branch2); background: var(--branch2-light); }
+.branch-btn[data-branch="branch2"].selected .b-name { color: var(--branch2); }
+
+.login-field { margin-bottom: 13px; }
+.login-field label { font-size: 12px; font-weight: 600; color: var(--text2); display: block; margin-bottom: 5px; }
+.login-field input { width: 100%; font-size: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg); color: var(--text); outline: none; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.login-field input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(76,46,140,0.14); background: var(--surface); }
+.login-err { font-size: 12px; color: var(--red); background: var(--red-light); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 13px; display: none; }
+.login-err.show { display: block; }
+.btn-login { width: 100%; background: var(--green); color: #fff; border: none; border-radius: var(--radius-sm); padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; font-family: inherit; transition: background 0.15s, transform 0.1s, box-shadow 0.15s; box-shadow: 0 4px 12px rgba(76,46,140,0.22); }
+.btn-login:hover { background: var(--green2); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(76,46,140,0.28); }
+.btn-login:active { transform: translateY(0); }
+.login-hint { font-size: 11px; color: var(--text3); text-align: center; margin-top: 12px; }
+
+/* TOPBAR */
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 56px; flex-shrink: 0; box-shadow: var(--shadow); gap: 8px; }
+.topbar-brand { display: flex; align-items: center; gap: 10px; }
+.topbar-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.topbar-icon.b1 { background: var(--branch1-light); }
+.topbar-icon.b2 { background: var(--branch2-light); }
+.topbar-icon i { font-size: 17px; }
+.topbar-icon.b1 i { color: var(--branch1); }
+.topbar-icon.b2 i { color: var(--branch2); }
+.topbar-texts {}
+.topbar-name { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.branch-badge { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 20px; display: inline-block; }
+.branch-badge.b1 { background: var(--branch1-light); color: var(--branch1); }
+.branch-badge.b2 { background: var(--branch2-light); color: var(--branch2); }
+.topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.user-chip { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text2); background: var(--bg2); border-radius: 20px; padding: 4px 10px; }
+.role-tag { font-size: 10px; padding: 1px 7px; border-radius: 20px; font-weight: 600; }
+.role-admin { background: var(--purple-light); color: var(--purple); }
+.role-staff { background: var(--green-light); color: var(--green2); }
+.btn-out { background: transparent; border: 1px solid var(--border); color: var(--text2); border-radius: var(--radius-sm); padding: 5px 11px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-family: inherit; transition: all 0.15s; }
+.btn-out:hover { background: var(--red-light); color: var(--red); border-color: #f09595; }
+
+/* TABS */
+.tab-row { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; overflow-x: auto; }
+.tab-btn { font-size: 13px; font-weight: 500; padding: 12px 16px; border: none; background: transparent; color: var(--text2); cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -1px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; transition: color 0.15s; }
+.tab-btn.active { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
+.tab-btn.active.b1-active { color: var(--branch1); border-bottom-color: var(--branch1); }
+.tab-btn.active.b2-active { color: var(--branch2); border-bottom-color: var(--branch2); }
+.tab-btn:hover:not(.active) { color: var(--text); background: var(--bg); }
+
+/* CONTENT */
+.content { flex: 1; padding: 1.5rem; max-width: 1100px; margin: 0 auto; width: 100%; }
+.page { display: none; }
+.page.active { display: block; }
+.stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 1.5rem; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); transition: box-shadow 0.15s, transform 0.15s; }
+.stat:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.stat-lbl { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.3px; margin-bottom: 6px; text-transform: uppercase; display: flex; align-items: center; gap: 5px; }
+.stat-lbl i { color: var(--purple); }
+.stat-val { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.pay-cnt { font-size: 11px; color: var(--text3); margin-top: 3px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.4rem; margin-bottom: 1.25rem; box-shadow: var(--shadow); }
+.card-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 1rem; display: flex; align-items: center; gap: 7px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.full { grid-column: 1/-1; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.2px; }
+.field input, .field select { font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--bg); color: var(--text); width: 100%; outline: none; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.field input:focus, .field select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(76,46,140,0.12); background: var(--surface); }
+.field input[readonly] { background: var(--bg2); cursor: default; }
+.price-wrap { position: relative; }
+.price-wrap input { padding-left: 22px; }
+.price-wrap .baht { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text2); pointer-events: none; }
+.req { color: #E24B4A; }
+.row-btns { display: flex; gap: 8px; margin-top: 1rem; }
+.proc-groups { display: flex; flex-direction: column; gap: 8px; }
+.proc-group-lbl { font-size: 10px; font-weight: 700; color: var(--text3); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 3px; }
+.proc-group-btns { display: flex; flex-wrap: wrap; gap: 5px; }
+.pq-btn { cursor: pointer; border: 1px solid var(--border); border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; background: var(--bg); color: var(--text2); font-family: inherit; transition: all 0.12s; }
+.pq-btn:hover,.pq-btn.sel { background: var(--green-light); color: var(--green2); border-color: var(--green); font-weight: 600; }
+.pq-btn.ortho:hover,.pq-btn.ortho.sel { background: var(--purple-light); color: var(--purple); border-color: var(--purple); }
+.pq-btn.xray:hover,.pq-btn.xray.sel { background: #FFF3E0; color: #E65100; border-color: #FF9800; }
+.btn-green { background: var(--green); color: #fff; border: none; border-radius: var(--radius-sm); padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; transition: background 0.15s, transform 0.1s; }
+.btn-green:hover { background: var(--green2); transform: translateY(-1px); }
+.btn-green:active { transform: translateY(0); }
+.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; cursor: pointer; font-family: inherit; transition: background 0.15s, border-color 0.15s; }
+.btn-ghost:hover { background: var(--bg2); border-color: var(--border2); }
+.btn-sm-teal { background: var(--green-light); color: var(--green2); border: 1px solid #5DCAA5; border-radius: var(--radius-sm); padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; }
+.btn-sm-teal:hover { background: #9FE1CB; }
+.btn-del { background: none; border: none; cursor: pointer; color: var(--text3); padding: 3px 5px; border-radius: 4px; font-size: 15px; }
+.btn-del:hover { color: var(--red); background: var(--red-light); }
+.tcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 1.25rem; }
+.tcard-hdr { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
+.tcard-title { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.search-wrap { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; background: var(--bg); }
+.search-wrap i { color: var(--text3); font-size: 14px; }
+.search-wrap input { border: none; background: transparent; font-size: 12px; color: var(--text); outline: none; width: 150px; font-family: inherit; }
+.scroll-x { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th { font-size: 11px; font-weight: 700; color: var(--text2); text-align: left; padding: 10px 14px; background: var(--bg2); border-bottom: 1px solid var(--border); letter-spacing: 0.3px; }
+td { font-size: 12px; color: var(--text); padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; word-break: break-word; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg); }
+.empty { text-align: center; padding: 2.5rem; color: var(--text3); font-size: 13px; }
+.empty i { font-size: 30px; display: block; margin-bottom: 8px; }
+.badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 600; }
+.bt{background:#E1F5EE;color:#085041;}.bb{background:#E6F1FB;color:#0C447C;}.bc{background:#FAECE7;color:#712B13;}.bp{background:#EEEDFE;color:#3C3489;}.ba{background:#FAEEDA;color:#633806;}.bpk{background:#FBEAF0;color:#72243E;}.bi{background:#E8EAF6;color:#283593;}.bg{background:#F5F5F5;color:#424242;}
+.chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.price-green { font-weight: 700; color: var(--green); }
+.dentist-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--purple-light); color: var(--purple); border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 9999; white-space: nowrap; }
+.toast.show { opacity: 1; }
+.dentist-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.dentist-row:last-child { border-bottom: none; }
+.dentist-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--purple-light); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--purple); flex-shrink: 0; }
+.row-inner { display: flex; align-items: center; gap: 10px; }
+.u-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.u-row:last-child { border-bottom: none; }
+.u-av { width: 34px; height: 34px; border-radius: 50%; background: var(--purple-light); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--purple); }
+.u-av.staff { background: var(--green-light); color: var(--green2); }
+/* receipt */
+.receipt-bg { background: var(--bg2); border-radius: var(--radius); padding: 1.5rem; }
+.receipt-actions { display: flex; gap: 8px; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap; }
+#receipt-doc { background: #fff; color: #000; font-family: 'Sarabun','TH Sarabun New','Angsana New',sans-serif; font-size: 13px; max-width: 600px; margin: 0 auto; border: 1.5px solid #7B68AB; position: relative; overflow: hidden; }
+#receipt-doc > * { position: relative; z-index: 1; }
+
+/* watermark */
+.r-wm { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-10deg); opacity: 0.06; pointer-events: none; z-index: 0; font-size: 80px; font-weight: 900; color: #5B3A8A; font-family: serif; white-space: nowrap; }
+
+/* header: logo LEFT, clinic info RIGHT */
+.r-hdr { display: flex; align-items: flex-start; padding: 8px 12px; border-bottom: 2px solid #7B68AB; gap: 10px; }
+.r-logo-area { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 72px; }
+.r-logo-circle { width: 60px; height: 60px; border: 3px solid #5B3A8A; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #f5f0fb; position: relative; }
+.r-logo-w { font-size: 28px; font-weight: 900; color: #5B3A8A; font-family: serif; line-height: 1; }
+.r-logo-tooth { position: absolute; bottom: 4px; right: 6px; font-size: 12px; }
+.r-logo-text { font-size: 7px; color: #5B3A8A; font-weight: 700; text-align: center; margin-top: 3px; line-height: 1.4; letter-spacing: 0.3px; }
+.r-cinfo { flex: 1; text-align: right; }
+.r-cname-th { font-size: 14px; font-weight: 800; color: #5B3A8A; line-height: 1.3; }
+.r-cname-en { font-size: 12px; font-weight: 700; color: #5B3A8A; }
+.r-caddr { font-size: 10px; color: #333; margin-top: 2px; line-height: 1.6; }
+
+/* infobar: ชื่อ / อายุ / วันที่ / เลขที่-เล่มที่ */
+.r-infobar { background: #7B68AB; color: #fff; display: grid; grid-template-columns: 2fr 0.6fr 0.9fr 1.2fr; }
+.r-ic { padding: 5px 8px; border-right: 1px solid rgba(255,255,255,0.2); }
+.r-ic:last-child { border-right: none; position: relative; }
+.r-il { font-size: 9px; opacity: 0.85; margin-bottom: 1px; }
+.r-iv { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* stamp */
+.r-stamp { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: #5B3A8A; color: #fff; border: 2px solid #fff; border-radius: 4px; padding: 3px 7px; font-size: 10px; font-weight: 800; text-align: center; line-height: 1.4; }
+
+/* patient info row */
+.r-patient { display: grid; grid-template-columns: 1.2fr 0.8fr; border-bottom: 1px solid #bbb; }
+.r-pc { padding: 5px 10px; }
+.r-pc:first-child { border-right: 1px solid #bbb; }
+.r-pf { display: flex; align-items: baseline; gap: 3px; margin-bottom: 3px; font-size: 11.5px; }
+.r-pl { color: #555; white-space: nowrap; min-width: 66px; font-size: 11px; }
+.r-pv { font-weight: 700; border-bottom: 1px solid #aaa; flex: 1; padding-bottom: 1px; font-size: 11.5px; }
+
+/* table */
+.r-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.r-table th { background: #EDE7F6; border: 1px solid #9B8EC4; padding: 4px 6px; text-align: center; font-weight: 700; font-size: 11px; color: #3a1a6a; }
+.r-table td { border: 1px solid #ccc; padding: 3px 6px; }
+.r-table .tno { text-align: center; width: 26px; }
+.r-table .tqty { text-align: center; width: 42px; }
+.r-table .tprice { text-align: right; width: 72px; }
+.r-table .tdisc { text-align: right; width: 62px; }
+.r-table .ttotal { text-align: right; width: 78px; font-weight: 700; }
+.erow td { height: 18px; }
+
+/* baht text */
+.r-baht { padding: 4px 12px; font-size: 11px; color: #3a1a6a; font-style: italic; border-bottom: 1px solid #bbb; background: #faf8ff; }
+
+/* bottom: payment left, summary right */
+.r-bottom { display: flex; font-size: 11.5px; }
+.r-paycol { flex: 1; padding: 7px 10px; border-right: 1.5px solid #bbb; }
+.r-paytitle { font-weight: 700; font-size: 11px; color: #5B3A8A; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.3px; }
+.r-payopt { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; font-size: 11.5px; }
+.r-circle { width: 13px; height: 13px; border: 1.5px solid #666; border-radius: 50%; flex-shrink: 0; }
+.r-circle.checked { border-color: #5B3A8A; background: #5B3A8A; }
+.r-payline { border-bottom: 1px dotted #aaa; flex: 1; margin: 0 4px; }
+.r-payamt { min-width: 52px; text-align: right; font-weight: 700; font-size: 11.5px; }
+
+/* summary 3 columns like the photo */
+.r-sumcol { width: 200px; flex-shrink: 0; display: flex; flex-direction: column; }
+.r-sumrow { display: flex; border-bottom: 1px solid #ddd; font-size: 11.5px; }
+.r-sumrow:last-child { border-bottom: none; }
+.r-sumlbl { flex: 1; padding: 4px 8px; color: #444; border-right: 1px solid #ddd; font-size: 11px; display: flex; align-items: center; }
+.r-sumval-wrap { display: flex; }
+.r-sumval { width: 70px; padding: 4px 6px; text-align: right; font-weight: 600; border-right: 1px solid #ddd; font-size: 11.5px; }
+.r-sumval:last-child { border-right: none; }
+.r-grandrow { background: #5B3A8A; color: #fff; font-weight: 700; font-size: 12px; display: flex; }
+.r-grandrow .r-sumlbl { color: #fff; border-right-color: rgba(255,255,255,0.3); }
+.r-grandrow .r-sumval { color: #fff; border-right-color: rgba(255,255,255,0.3); }
+
+/* signature */
+.r-sig { display: flex; border-top: 1px solid #bbb; font-size: 11px; text-align: center; }
+.r-sigbox { flex: 1; padding: 6px 10px 8px; border-right: 1px solid #bbb; display: flex; flex-direction: column; align-items: center; }
+.r-sigbox:last-child { border-right: none; }
+.r-sigline { border-bottom: 1px solid #888; width: 70%; margin: 14px auto 3px; }
+.r-siglbl { color: #666; font-size: 10.5px; }
+.r-signame { font-weight: 700; font-size: 11px; margin-top: 1px; }
+.li-builder { border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin:12px 0; background:var(--bg); display:flex; flex-direction:column; gap:14px; }
+.chart-toggle { display:flex; gap:8px; margin-bottom:2px; }
+
+/* ─── Interactive SVG tooth chart ─── */
+.tooth-chart { margin-bottom:4px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 4px; }
+.tooth-svg { width:100%; height:auto; max-width:720px; display:block; margin:0 auto; overflow:visible; }
+.tc-gumband { fill:var(--purple-light); opacity:0.55; }
+.tc-midline { stroke:var(--border2); stroke-width:1; stroke-dasharray:3 5; }
+.tooth-shape { cursor:pointer; }
+.tooth-shape .tooth-root { fill:#F2EFF7; stroke:var(--border2); stroke-width:1; transition:fill 0.12s, stroke 0.12s; }
+.tooth-shape .tooth-crown { fill:#FFFFFF; stroke:var(--border2); stroke-width:1.3; transition:fill 0.12s, stroke 0.12s; }
+.tooth-shape:hover .tooth-crown { stroke:var(--purple); }
+.tooth-shape:hover .tooth-root { stroke:var(--purple); }
+.tooth-shape.sel .tooth-crown { fill:var(--purple); stroke:var(--purple2); }
+.tooth-shape.sel .tooth-root { fill:var(--purple2); stroke:var(--purple2); }
+.tooth-num { font-size:12px; font-weight:600; fill:var(--text2); cursor:pointer; user-select:none; }
+.tooth-num.sel { fill:var(--purple); font-weight:800; }
+
+.surface-picker:empty { display:none; }
+.surf-picker-box { display:flex; gap:22px; align-items:center; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px 16px; }
+.surf-picker-head { font-size:12px; font-weight:700; color:var(--text); margin-bottom:2px; }
+.surf-picker-sub { font-size:11px; color:var(--text3); margin-bottom:10px; }
+.surf-target { width:118px; height:118px; flex-shrink:0; }
+.surf-region { fill:var(--bg2); stroke:var(--surface); stroke-width:3; cursor:pointer; transition:fill 0.12s; }
+.surf-region:hover { fill:var(--purple-light); }
+.surf-region.sel { fill:var(--purple); }
+.surf-center { fill:var(--surface); stroke:var(--border2); stroke-width:2; cursor:pointer; transition:fill 0.12s, stroke 0.12s; }
+.surf-center:hover { stroke:var(--purple); }
+.surf-center.sel { fill:var(--purple2); stroke:var(--purple2); }
+.surf-label { font-size:12px; font-weight:700; fill:var(--text2); pointer-events:none; }
+.surf-label-center { font-size:12px; font-weight:800; pointer-events:none; }
+.surf-legend-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.surf-legend-item { border:1px solid var(--border); border-radius:20px; padding:4px 11px; cursor:pointer; font-size:11px; font-weight:500; color:var(--text2); background:var(--bg); transition:all 0.12s; }
+.surf-legend-item:hover { border-color:var(--purple); color:var(--purple); }
+.surf-legend-item.sel { background:var(--purple-light); color:var(--purple); border-color:var(--purple); font-weight:700; }
+
+.li-table { width:100%; border-collapse:collapse; }
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}.full{grid-column:auto;}.content{padding:1rem;}.topbar{padding:0 1rem;}.tab-row{padding:0 1rem;}.branch-grid{grid-template-columns:1fr 1fr;}}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+</style>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+
+
+const BRANCHES = {
+  branch1: { key:'branch1', name:'สาขาเทพารักษ์', nameEn:'Thepharak Branch', cls:'b1' },
+  branch2: { key:'branch2', name:'สาขาศรีนครินทร์', nameEn:'Srinakarin Branch', cls:'b2' }
+};
+
+const PROC_GROUPS=[
+  {label:'🦷 ทันตกรรมทั่วไป',cls:'',items:['ขูดหินปูน','อุดฟัน','ถอนฟัน','ผ่าฟันคุด','เกลารากฟัน']},
+  {label:'👑 ทันตกรรมบูรณะ',cls:'',items:['รากเทียม','ครอบฟัน','สะพานฟัน','ฟันปลอมฐานพลาสติก','ฟันปลอมฐานโลหะ','ฟันปลอมทั้งปาก']},
+  {label:'🔧 จัดฟัน',cls:'ortho',items:['ปรับเครื่องมือจัดฟัน','ติดอุปกรณ์หลุด','ติดอุปกรณ์จัดฟันบน','ติดอุปกรณ์จัดฟันล่าง','จองโปรโมชั่นจัดฟัน']},
+  {label:'📷 เอกซเรย์',cls:'xray',items:['ถ่ายเอกซเรย์ฟิล์มเล็ก','ถ่ายเอกซเรย์ฟิล์มใหญ่']}
+];
+const ALL_PROCS=PROC_GROUPS.flatMap(g=>g.items);
+const BC=['bt','bb','bc','bp','ba','bpk','bi','bg'];
+const pcm={}; let ci=0;
+function gpc(p){if(!pcm[p])pcm[p]=BC[ci++%BC.length];return pcm[p];}
+ALL_PROCS.forEach(p=>gpc(p));
+
+// ─── Firebase ───────────────────────────────────────────────────────────────
+// ─── Firebase ───────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCPJeGGyUe4Lz7zH00t8U2pbNkuhTpP8ik",
+  authDomain: "wtt-dental.firebaseapp.com",
+  databaseURL: "https://wtt-dental-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "wtt-dental",
+  storageBucket: "wtt-dental.firebasestorage.app",
+  messagingSenderId: "474856182089",
+  appId: "1:474856182089:web:68dbeafa16b8c58d848a98"
+};
+let db = null;
+function initFirebase(){if(db)return;
+  try {
+    if(typeof firebase !== 'undefined'){
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      console.log('Firebase ready');
+    } else { console.warn('Firebase not loaded, using localStorage'); }
+  } catch(e){ console.warn('Firebase init error:', e); }
+}
+initFirebase();
+
+// helpers
+function fbSet(path, data){ if(!db) return Promise.resolve(); return db.ref(path).set(data); }
+async function fbGet(path){ if(!db) return null; const snap = await db.ref(path).once('value'); return snap.exists() ? snap.val() : null; }
+
+function sp(){ fbSet('branches/'+currentBranch.key+'/patients', patients); try{localStorage.setItem('wtt_patients_'+currentBranch.key,JSON.stringify(patients));}catch(e){} }
+function sd(){ fbSet('branches/'+currentBranch.key+'/dentists', dentists); try{localStorage.setItem('wtt_dentists_'+currentBranch.key,JSON.stringify(dentists));}catch(e){} }
+function sc(){ fbSet('branches/'+currentBranch.key+'/clinic', clinic); try{localStorage.setItem('wtt_clinic_'+currentBranch.key,JSON.stringify(clinic));}catch(e){} }
+function su(){ fbSet('global/users', users); try{localStorage.setItem('wtt_users',JSON.stringify(users));}catch(e){} }
+
+const DEFAULT_USERS = [
+  {id:1,username:'admin',password:'admin1234',name:'ผู้ดูแลระบบ',role:'admin'},
+  {id:2,username:'staff',password:'staff1234',name:'เจ้าหน้าที่',role:'staff'}
+];
+
+// ─── Migration: เดิม branches/{bkey}/records (flat) → branches/{bkey}/patients (nested) ──
+// ทำครั้งเดียวต่อสาขา, ไม่แตะ/ลบข้อมูลเดิม, มี guard กันรันซ้ำ
+async function migrateOldRecordsIfNeeded(bkey){
+  if(!db) return;
+  try{
+    const done = await fbGet('branches/'+bkey+'/migrationDone');
+    if(done===true) return;
+    const oldRecs = await fbGet('branches/'+bkey+'/records');
+    if(!oldRecs){ await fbSet('branches/'+bkey+'/migrationDone', true); return; }
+    const flat = Object.values(oldRecs);
+    const groups={};
+    flat.forEach(r=>{
+      const key = (r.dn&&r.dn.trim()) ? 'dn:'+r.dn.trim() : 'nk:'+(r.name||'').trim().toLowerCase()+'|'+(r.pid||'')+'|'+(r.tel||'');
+      (groups[key]=groups[key]||[]).push(r);
+    });
+    const newPatients={};
+    Object.values(groups).forEach(recs=>{
+      recs.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+      const first=recs[0];
+      const patientId='mig_'+(first.dn?first.dn:first.id);
+      const visits={};
+      recs.forEach(r=>{
+        const visitId='mig_v_'+r.id;
+        const price=r.price||0, discount=r.discount||0;
+        visits[visitId]={
+          id:visitId, rNo:r.rNo, date:r.date, dentistId:r.dentistId, dentition:'adult',
+          items:[{procedure:(r.procedures||[]).join(', ')||'รวมยอดเดิม', tooth:'', surfaces:[], price}],
+          discount, subtotal:price, total:price-discount,
+          payment:r.payment||'cash', note:r.note||'', by:r.by||''
+        };
+      });
+      newPatients[patientId]={
+        id:patientId, dn:first.dn||'', name:first.name, pid:first.pid||'',
+        birthdate:'', age:first.age||'', tel:first.tel||'',
+        createdAt:Date.now(), createdBy:'migration', visits
+      };
+    });
+    const existing = (await fbGet('branches/'+bkey+'/patients')) || {};
+    const merged = {...newPatients, ...existing};
+    await fbSet('branches/'+bkey+'/patients', merged);
+    await fbSet('branches/'+bkey+'/migrationDone', true);
+  }catch(e){ console.warn('Migration failed:', e); }
+}
+
+async function loadBranchData(bkey) {
+  showLoading(true);
+  let p={}, d=[], c={}, u=[];
+  // โหลด localStorage ก่อนเสมอ (fallback ทันที)
+  try{p=JSON.parse(localStorage.getItem('wtt_patients_'+bkey)||'{}');}catch(e){}
+  try{d=JSON.parse(localStorage.getItem('wtt_dentists_'+bkey)||'[]');}catch(e){}
+  try{c=JSON.parse(localStorage.getItem('wtt_clinic_'+bkey)||'{}');}catch(e){}
+  try{u=JSON.parse(localStorage.getItem('wtt_users')||'[]');}catch(e){}
+  if(!u.length){ u=[...DEFAULT_USERS]; try{localStorage.setItem('wtt_users',JSON.stringify(u));}catch(e){} }
+  // ลอง Firebase เพิ่มเติม (ถ้าออนไลน์)
+  try {
+    await migrateOldRecordsIfNeeded(bkey);
+    const snap = await Promise.race([
+      db.ref('branches/'+bkey).once('value'),
+      new Promise((_,rej)=>setTimeout(()=>rej('timeout'),3000))
+    ]);
+    const gsnap = await db.ref('global/users').once('value');
+    if(snap.exists()){
+      const v = snap.val();
+      if(v.patients) p = v.patients;
+      if(v.dentists) d = Object.values(v.dentists);
+      if(v.clinic) c = v.clinic;
+    }
+    if(gsnap.exists()){ u = Object.values(gsnap.val()); }
+  } catch(e) { /* ใช้ข้อมูล localStorage ที่โหลดไปแล้ว */ }
+  showLoading(false);
+  return {patients:p, dentists:d, clinic:c, users:u};
+}
+
+// Real-time listener
+let fbListeners = [];
+function startRealtimeSync(bkey){
+  try{ if(!db){console.log("No DB, skip sync");return;} }catch(e){return;}
+  stopRealtimeSync();
+  const h1 = db.ref('branches/'+bkey+'/patients').on('value', snap=>{
+    if(!currentBranch)return;
+    const newPatients = snap.exists() ? snap.val() : {};
+    if(JSON.stringify(newPatients)!==JSON.stringify(patients)){
+      patients = newPatients;
+      renderTable(); updateStats(); renderReceiptList();
+      if(document.getElementById('dash-start').value) renderDashboard();
+    }
+  });
+  const h2 = db.ref('branches/'+bkey+'/dentists').on('value', snap=>{
+    if(!currentBranch)return;
+    dentists = snap.exists() ? Object.values(snap.val()) : [];
+    rdl(); rds();
+  });
+  const h3 = db.ref('global/users').on('value', snap=>{
+    if(!currentBranch)return;
+    users = snap.exists() ? Object.values(snap.val()) : [];
+    renderUserList();
+  });
+  fbListeners = [
+    {r: db.ref('branches/'+bkey+'/patients'), h: h1},
+    {r: db.ref('branches/'+bkey+'/dentists'), h: h2},
+    {r: db.ref('global/users'), h: h3}
+  ];
+}
+function stopRealtimeSync(){
+  fbListeners.forEach(({r,h})=>r.off('value',h));
+  fbListeners=[];
+}
+
+function showLoading(show){
+  let el=document.getElementById('fb-loading');
+  if(!el && !show) return;
+  if(!el){
+    el=document.createElement('div');
+    el.id='fb-loading';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-size:15px;color:#5B3A8A;gap:10px;';
+    el.innerHTML='<i class="ti ti-cloud-download" style="font-size:32px;animation:spin 1s linear infinite;"></i><div>กำลังโหลดข้อมูล...</div>';
+    document.body.appendChild(el);
+  }
+  el.style.display=show?'flex':'none';
+}
+
+// ─── /Firebase ──────────────────────────────────────────────────────────────
+
+let currentUser=null, currentBranch=null, selBranch=null;
+let patients={},dentists=[],clinic={},users=[];
+let selProcs=[],rCnt=1,currentReceiptId=null;
+let currentVisitItems=[], chartMode='adult', selectedTooth=null, selectedSurfaces=[];
+const today=new Date().toISOString().split('T')[0];
+
+const ADULT_QUADS = {
+  ur:[18,17,16,15,14,13,12,11],
+  ul:[21,22,23,24,25,26,27,28],
+  lr:[48,47,46,45,44,43,42,41],
+  ll:[31,32,33,34,35,36,37,38]
+};
+const CHILD_QUADS = {
+  ur:[55,54,53,52,51],
+  ul:[61,62,63,64,65],
+  lr:[85,84,83,82,81],
+  ll:[71,72,73,74,75]
+};
+// ฟันหน้า (Anterior: incisor/canine, FDI last digit 1-3): Mesial, Distal, Labial, Palatal/Lingual, Incisal
+const SURF_ANTERIOR=[{code:'M',label:'Mesial'},{code:'D',label:'Distal'},{code:'L',label:'Labial'},{code:'P',label:'Palatal/Lingual'},{code:'I',label:'Incisal'}];
+// ฟันหลัง (Posterior: premolar/molar, FDI last digit 4-8): Mesial, Distal, Buccal, Lingual, Occlusal
+const SURF_POSTERIOR=[{code:'M',label:'Mesial'},{code:'D',label:'Distal'},{code:'B',label:'Buccal'},{code:'L',label:'Lingual'},{code:'O',label:'Occlusal'}];
+
+function toothLastDigit(fdi){ return Number(String(fdi).slice(-1)); }
+function isAnteriorTooth(fdi){ return toothLastDigit(fdi)<=3; }
+function toothTypeOf(fdi){
+  const last=toothLastDigit(fdi);
+  if(last<=2) return 'incisor';
+  if(last===3) return 'canine';
+  if(last===4) return 'premolar';
+  return 'molar';
+}
+
+// ─── เรขาคณิตของผังฟันรูปโค้ง (arch geometry) ───────────────────────────────
+const ARCH = { cx:380, cyMid:230, rx:300, ryU:170, ryL:170, thetaStart:170, thetaEnd:10 };
+
+function archPoint(idx, count, upper){
+  const t = count===1 ? 0.5 : idx/(count-1);
+  const thetaDeg = ARCH.thetaStart - t*(ARCH.thetaStart-ARCH.thetaEnd);
+  const theta = thetaDeg*Math.PI/180;
+  const x = ARCH.cx + ARCH.rx*Math.cos(theta);
+  const y = upper ? (ARCH.cyMid - ARCH.ryU*Math.sin(theta)) : (ARCH.cyMid + ARCH.ryL*Math.sin(theta));
+  return {x, y, cx:ARCH.cx, cy:ARCH.cyMid};
+}
+function rotForPoint(p){
+  const dx=p.x-p.cx, dy=p.y-p.cy;
+  const len=Math.hypot(dx,dy)||1;
+  const ux=dx/len, uy=dy/len;
+  return Math.atan2(-ux, uy)*180/Math.PI;
+}
+function archPoints(upper, pad){
+  const N=40; const pts=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const thetaDeg=ARCH.thetaStart - t*(ARCH.thetaStart-ARCH.thetaEnd);
+    const theta=thetaDeg*Math.PI/180;
+    const x=ARCH.cx+(ARCH.rx+pad)*Math.cos(theta);
+    const y=upper ? (ARCH.cyMid-(ARCH.ryU+pad)*Math.sin(theta)) : (ARCH.cyMid+(ARCH.ryL+pad)*Math.sin(theta));
+    pts.push([x,y]);
+  }
+  return pts;
+}
+function pathFromPoints(pts){
+  return pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+}
+function gumBandD(upper){
+  const outer=archPoints(upper,40);
+  const inner=archPoints(upper,-22).reverse();
+  return pathFromPoints(outer)+' '+pathFromPoints(inner).replace(/^M/,'L')+' Z';
+}
+
+// รูปทรงฟันแต่ละประเภท (local coords, origin ~กึ่งกลางฟัน, แกน y ลง = รากฟัน)
+function toothShapeMarkup(type){
+  switch(type){
+    case 'incisor':
+      return { crown:'M -6,-15 Q -6,-17 -3,-17 L 3,-17 Q 6,-17 6,-15 L 6,-2 Q 6,1.5 0,1.5 Q -6,1.5 -6,-2 Z',
+                root:'M -3.2,-1 Q -4.2,10 -1.5,15.5 Q 0,17.5 1.5,15.5 Q 4.2,10 3.2,-1 Z' };
+    case 'canine':
+      return { crown:'M -6,-2 Q -6.5,-9.5 -1,-17.5 Q 0,-19.5 1,-17.5 Q 6.5,-9.5 6,-2 Q 0,2.2 -6,-2 Z',
+                root:'M -3.2,-2 Q -4.4,10 -1.5,16.5 Q 0,18.5 1.5,16.5 Q 4.4,10 3.2,-2 Z' };
+    case 'premolar':
+      return { crown:'M -7.5,-3 Q -8,-13 -3.5,-15 Q -1.5,-16.5 0,-14.5 Q 1.5,-16.5 3.5,-15 Q 8,-13 7.5,-3 Q 0,2.2 -7.5,-3 Z',
+                root:'M -4,-2 Q -5.6,9 -3,15 Q -1.2,18 0,15.5 Q 1.2,18 3,15 Q 5.6,9 4,-2 Z' };
+    case 'molar':
+    default:
+      return { crown:'M -10,-4 Q -10.5,-14 -6,-16 Q -3,-17.5 0,-15.5 Q 3,-17.5 6,-16 Q 10.5,-14 10,-4 Q 0,3 -10,-4 Z',
+                root:'M -6,-3 Q -8,9 -4,15.5 Q -2,18.5 0,15 Q 2,18.5 4,15.5 Q 8,9 6,-3 Z' };
+  }
+}
+function fdiListsForMode(mode){
+  const q = mode==='adult' ? ADULT_QUADS : CHILD_QUADS;
+  return { upper:[...q.ur, ...q.ul], lower:[...q.lr, ...q.ll] };
+}
+
+function selectBranch(bkey) {
+  selBranch = bkey;
+  document.querySelectorAll('.branch-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector('.branch-btn[data-branch="'+bkey+'"]').classList.add('selected');
+}
+
+async function doLogin(){
+  if(!selBranch){toast('กรุณาเลือกสาขาก่อน');return;}
+  const u=document.getElementById('login-user').value.trim();
+  const p=document.getElementById('login-pass').value;
+  // ตรวจสอบ default users ก่อนเลย (ไม่ต้องรอ Firebase)
+  let checkUsers = [...DEFAULT_USERS];
+  try{const lu=JSON.parse(localStorage.getItem('wtt_users')||'[]');if(lu.length)checkUsers=lu;}catch(e){}
+  let found = checkUsers.find(x=>x.username===u&&x.password===p);
+  if(!found){toast('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');return;}
+  // login สำเร็จ — โหลดข้อมูลสาขา
+  const data=await loadBranchData(selBranch);
+  // อัปเดต found จาก Firebase ถ้าโหลดได้
+  if(data.users && data.users.length){
+    const fbFound=data.users.find(x=>x.username===u&&x.password===p);
+    if(fbFound) found=fbFound;
+  }
+  document.getElementById('login-err').classList.remove('show');
+  currentUser=found; currentBranch=BRANCHES[selBranch];
+  patients=data.patients; dentists=data.dentists; clinic=data.clinic; users=data.users;
+  // นับ receipt counter
+  const allVisits=flattenVisits();
+  if(allVisits.length){const nums=allVisits.map(r=>parseInt(r.rNo)).filter(n=>!isNaN(n));rCnt=nums.length?Math.max(...nums)+1:1;}
+
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-screen').classList.remove('hidden');
+  document.getElementById('topbar-user').textContent=found.name||found.username;
+  const rb=document.getElementById('topbar-role');rb.textContent=found.role==='admin'?'Admin':'Staff';rb.className='role-tag '+(found.role==='admin'?'role-admin':'role-staff');
+  document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden',found.role!=='admin'));
+
+  // อัปเดต branch UI
+  const tbi=document.getElementById('tb-icon');
+  tbi.className='topbar-icon '+currentBranch.cls;
+  const tbb=document.getElementById('tb-branch-badge');
+  tbb.textContent=currentBranch.name; tbb.className='branch-badge '+currentBranch.cls;
+  document.getElementById('branch-indicator').textContent=currentBranch.name;
+  document.getElementById('branch-indicator').className='branch-badge '+currentBranch.cls;
+  // active tab color
+  document.querySelectorAll('.tab-btn.active').forEach(b=>{ b.classList.remove('b1-active','b2-active'); b.classList.add(currentBranch.cls+'-active'); });
+
+  document.getElementById('f-date').value=today;
+  rds();rdl();renderTable();updateStats();loadSettings();setChartMode('adult');
+  startRealtimeSync(selBranch);
+}
+function doSignOut(){stopRealtimeSync();currentUser=null;currentBranch=null;selBranch=null;document.getElementById('app-screen').classList.add('hidden');document.getElementById('login-screen').classList.remove('hidden');document.getElementById('login-user').value='';document.getElementById('login-pass').value='';document.querySelectorAll('.branch-btn').forEach(b=>b.classList.remove('selected'));switchTab('record');}
+
+function loadSettings(){
+  document.getElementById('settings-branch-name').textContent=currentBranch?currentBranch.name:'';
+  if(clinic.addr)document.getElementById('s-addr').value=clinic.addr;else document.getElementById('s-addr').value='';
+  if(clinic.tel)document.getElementById('s-tel').value=clinic.tel;else document.getElementById('s-tel').value='';
+  if(clinic.bookNo)document.getElementById('s-bookno').value=clinic.bookNo;else document.getElementById('s-bookno').value='';
+}
+function saveSettings(){clinic.addr=document.getElementById('s-addr').value.trim();clinic.tel=document.getElementById('s-tel').value.trim();clinic.bookNo=document.getElementById('s-bookno').value.trim()||'0009';sc();toast('บันทึกเรียบร้อย');}
+
+// สร้างปุ่มหัตถการ (เลือกได้ทีละ 1 รายการ สำหรับสร้างรายการหัตถการที่กำลังเพิ่ม)
+const qp=document.getElementById('proc-quick');
+PROC_GROUPS.forEach(g=>{const gd=document.createElement('div');const lb=document.createElement('div');lb.className='proc-group-lbl';lb.textContent=g.label;gd.appendChild(lb);const bd=document.createElement('div');bd.className='proc-group-btns';g.items.forEach(p=>{const b=document.createElement('button');b.type='button';b.className='pq-btn'+(g.cls?' '+g.cls:'');b.textContent=p;b.onclick=()=>{
+  const already=selProcs[0]===p;
+  document.querySelectorAll('#proc-quick .pq-btn.sel').forEach(x=>x.classList.remove('sel'));
+  if(already){selProcs=[];}else{selProcs=[p];b.classList.add('sel');}
+};bd.appendChild(b);});gd.appendChild(bd);qp.appendChild(gd);});
+
+// ─── ผังฟัน (Interactive SVG Dental Chart, FDI notation) ───────────────────
+function setChartMode(mode){
+  chartMode=mode; selectedTooth=null; selectedSurfaces=[];
+  document.getElementById('btn-mode-adult').classList.toggle('sel',mode==='adult');
+  document.getElementById('btn-mode-child').classList.toggle('sel',mode==='child');
+  renderToothChart(); renderSurfacePicker();
+}
+function toothGroupMarkup(fdi, p, rot){
+  const sel = selectedTooth===String(fdi);
+  const shp = toothShapeMarkup(toothTypeOf(fdi));
+  const dx=p.x-p.cx, dy=p.y-p.cy; const len=Math.hypot(dx,dy)||1;
+  const ux=dx/len, uy=dy/len;
+  const lx=p.x+ux*26, ly=p.y+uy*26;
+  return `<g class="tooth-shape${sel?' sel':''}" onclick="selectTooth('${fdi}')" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)}) rotate(${rot.toFixed(1)})">
+      <path class="tooth-root" d="${shp.root}"></path>
+      <path class="tooth-crown" d="${shp.crown}"></path>
+    </g>
+    <text class="tooth-num${sel?' sel':''}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" onclick="selectTooth('${fdi}')">${fdi}</text>`;
+}
+function renderToothChart(){
+  const {upper, lower} = fdiListsForMode(chartMode);
+  const upperMk = upper.map((fdi,i)=>toothGroupMarkup(fdi, archPoint(i,upper.length,true), rotForPoint(archPoint(i,upper.length,true)))).join('');
+  const lowerMk = lower.map((fdi,i)=>toothGroupMarkup(fdi, archPoint(i,lower.length,false), rotForPoint(archPoint(i,lower.length,false)))).join('');
+  document.getElementById('tooth-chart').innerHTML = `
+    <svg viewBox="0 0 760 460" class="tooth-svg" xmlns="http://www.w3.org/2000/svg">
+      <path class="tc-gumband" d="${gumBandD(true)}"></path>
+      <path class="tc-gumband" d="${gumBandD(false)}"></path>
+      <line x1="60" y1="230" x2="700" y2="230" class="tc-midline"></line>
+      ${upperMk}
+      ${lowerMk}
+    </svg>`;
+}
+function selectTooth(fdi){
+  selectedTooth = (selectedTooth===String(fdi)) ? null : String(fdi);
+  selectedSurfaces=[];
+  renderToothChart(); renderSurfacePicker();
+}
+function renderSurfacePicker(){
+  const el=document.getElementById('surface-picker');
+  if(!selectedTooth){el.innerHTML='';return;}
+  const fdi=selectedTooth;
+  const anterior=isAnteriorTooth(fdi);
+  const set=anterior?SURF_ANTERIOR:SURF_POSTERIOR;
+  const byCode=c=>set.find(s=>s.code===c);
+  const top=byCode(anterior?'L':'B'), bottom=byCode(anterior?'P':'L'), left=byCode('M'), right=byCode('D'), center=byCode(anterior?'I':'O');
+  const isSel=c=>selectedSurfaces.includes(c);
+  const centerSel=isSel(center.code);
+  const svg=`<svg viewBox="0 0 120 120" class="surf-target" xmlns="http://www.w3.org/2000/svg">
+      <polygon class="surf-region${isSel(top.code)?' sel':''}" points="10,10 110,10 60,60" onclick="toggleSurface('${top.code}')"></polygon>
+      <polygon class="surf-region${isSel(right.code)?' sel':''}" points="110,10 110,110 60,60" onclick="toggleSurface('${right.code}')"></polygon>
+      <polygon class="surf-region${isSel(bottom.code)?' sel':''}" points="110,110 10,110 60,60" onclick="toggleSurface('${bottom.code}')"></polygon>
+      <polygon class="surf-region${isSel(left.code)?' sel':''}" points="10,110 10,10 60,60" onclick="toggleSurface('${left.code}')"></polygon>
+      <circle class="surf-center${centerSel?' sel':''}" cx="60" cy="60" r="21" onclick="toggleSurface('${center.code}')"></circle>
+      <text class="surf-label" x="60" y="5" text-anchor="middle" dominant-baseline="hanging">${top.code}</text>
+      <text class="surf-label" x="115" y="60" text-anchor="end" dominant-baseline="middle">${right.code}</text>
+      <text class="surf-label" x="60" y="115" text-anchor="middle" dominant-baseline="auto">${bottom.code}</text>
+      <text class="surf-label" x="5" y="60" text-anchor="start" dominant-baseline="middle">${left.code}</text>
+      <text class="surf-label-center" x="60" y="61" text-anchor="middle" dominant-baseline="middle" style="fill:${centerSel?'#fff':'var(--text)'};pointer-events:none;">${center.code}</text>
+    </svg>`;
+  const legend=set.map(s=>`<span class="surf-legend-item${isSel(s.code)?' sel':''}" onclick="toggleSurface('${s.code}')">${s.code} · ${s.label}</span>`).join('');
+  el.innerHTML=`<div class="surf-picker-box">
+      <div class="surf-target-wrap">${svg}</div>
+      <div>
+        <div class="surf-picker-head">ซี่ฟัน ${fdi} · ${anterior?'ฟันหน้า':'ฟันหลัง'} (คลิกส่วนของฟันเพื่อเลือกด้าน)</div>
+        <div class="surf-picker-sub">เลือกได้มากกว่า 1 ด้าน</div>
+        <div class="surf-legend-list">${legend}</div>
+      </div>
+    </div>`;
+}
+function toggleSurface(code){
+  if(selectedSurfaces.includes(code)) selectedSurfaces=selectedSurfaces.filter(c=>c!==code);
+  else selectedSurfaces.push(code);
+  renderSurfacePicker();
+}
+
+// ─── รายการหัตถการใน visit ที่กำลังสร้าง ────────────────────────────────────
+function addLineItem(){
+  if(!selProcs.length){toast('กรุณาเลือกหัตถการ');return;}
+  const price=parseFloat(document.getElementById('li-price').value)||0;
+  currentVisitItems.push({procedure:selProcs[0],tooth:selectedTooth||'',surfaces:[...selectedSurfaces],price});
+  selProcs=[]; selectedTooth=null; selectedSurfaces=[];
+  document.querySelectorAll('#proc-quick .pq-btn.sel').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('li-price').value='';
+  renderToothChart(); renderSurfacePicker(); renderLineItems();
+}
+function removeLineItem(idx){currentVisitItems.splice(idx,1);renderLineItems();}
+function renderLineItems(){
+  const body=document.getElementById('line-items-body');
+  document.getElementById('li-empty').style.display=currentVisitItems.length?'none':'block';
+  body.innerHTML=currentVisitItems.map((it,i)=>`<tr><td style="font-size:12px;">${it.procedure}</td><td style="text-align:center;font-size:12px;">${it.tooth||'-'}</td><td style="font-size:11px;">${(it.surfaces||[]).join(', ')||'-'}</td><td class="price-green">${fp(it.price)}</td><td><button class="btn-del" onclick="removeLineItem(${i})"><i class="ti ti-trash"></i></button></td></tr>`).join('');
+  updateVisitTotals();
+}
+function updateVisitTotals(){
+  const subtotal=currentVisitItems.reduce((s,it)=>s+(it.price||0),0);
+  const disc=parseFloat(document.getElementById('f-discount').value)||0;
+  document.getElementById('visit-net').textContent=fp(subtotal-disc);
+}
+
+function rds(){const sel=document.getElementById('f-dentist');const cur=sel.value;sel.innerHTML='<option value="">-- เลือกทันตแพทย์ --</option>';dentists.forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent='ทพ. '+d.fname+' '+d.lname+(d.spec?' ('+d.spec+')':'');sel.appendChild(o);});if(cur)sel.value=cur;}
+function rdl(){const el=document.getElementById('dentist-list');if(!dentists.length){el.innerHTML='<div class="empty"><i class="ti ti-user-off"></i>ยังไม่มีทันตแพทย์</div>';return;}el.innerHTML=dentists.map(d=>`<div class="dentist-row"><div class="row-inner"><div class="dentist-avatar">${d.fname[0]}${d.lname[0]}</div><div><div style="font-size:13px;font-weight:600;">ทพ. ${d.fname} ${d.lname}</div><div style="font-size:11px;color:var(--text2);">${d.license?'ใบอนุญาต: '+d.license:''}${d.license&&d.spec?' · ':''}${d.spec||''}</div></div></div><button class="btn-del" onclick="delD(${d.id})"><i class="ti ti-trash"></i></button></div>`).join('');}
+function addDentist(){const fn=document.getElementById('d-fname').value.trim(),ln=document.getElementById('d-lname').value.trim();if(!fn||!ln){toast('กรุณากรอกชื่อและนามสกุล');return;}dentists.push({id:Date.now(),fname:fn,lname:ln,license:document.getElementById('d-license').value.trim(),spec:document.getElementById('d-spec').value.trim()});sd();rdl();rds();['d-fname','d-lname','d-license','d-spec'].forEach(id=>document.getElementById(id).value='');toast('เพิ่มทันตแพทย์เรียบร้อย');}
+function delD(id){dentists=dentists.filter(d=>d.id!==id);sd();rdl();rds();}
+function gdn(id){const d=dentists.find(x=>x.id==id);return d?'ทพ. '+d.fname+' '+d.lname:'-';}
+
+function switchTab(tab){const tabs=['record','receipt','dentists','admin','dashboard','settings'];tabs.forEach(t=>{const b=document.getElementById('tab-'+t);if(b){b.classList.remove('active','b1-active','b2-active');}});const active=document.getElementById('tab-'+tab);if(active){active.classList.add('active');if(currentBranch)active.classList.add(currentBranch.cls+'-active');}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-'+tab).classList.add('active');if(tab==='receipt')renderReceiptList();if(tab==='admin')renderUserList();if(tab==='settings')loadSettings();if(tab==='dashboard'){if(!document.getElementById('dash-start').value){setDashRange('today');}else{renderDashboard();}}}
+
+function baht(n){if(!n||n===0)return'ศูนย์บาทถ้วน';const dg=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'],ps=['','สิบ','ร้อย','พัน','หมื่น','แสน','ล้าน'];function rg(x){let s='',sn=String(parseInt(x));for(let i=0;i<sn.length;i++){let d=parseInt(sn[i]),p=sn.length-1-i;if(d===0)continue;if(p===1&&d===2)s+='ยี่';else if(p===1&&d===1)s+='';else s+=dg[d];s+=ps[p];}return s;}let ip=Math.floor(n),dp=Math.round((n-ip)*100),r='';if(ip>=1000000){r+=rg(Math.floor(ip/1000000))+'ล้าน';ip=ip%1000000;}if(ip>0)r+=rg(ip);r+='บาท';return r+(dp>0?rg(dp)+'สตางค์':'ถ้วน');}
+function fdt(d){if(!d)return'-';const ms=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];const[y,m,day]=d.split('-');return`${parseInt(day)} ${ms[parseInt(m)-1]} ${parseInt(y)+543}`;}
+function fd(d){if(!d)return'-';const[y,m,day]=d.split('-');return`${day}/${m}/${y.slice(2)}`;}
+function fmtMonthTH(ym){ const ms=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']; const[y,m]=ym.split('-'); return (ms[parseInt(m,10)-1]||m)+' '+(parseInt(y,10)+543); }
+const ORTHO_PROMO_PROC='จองโปรโมชั่นจัดฟัน';
+function fp(p){if(p===null||p===undefined||p==='')return'-';return'฿'+Number(p).toLocaleString('th-TH');}
+function fn(p){if(!p&&p!==0)return'-';return Number(p).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+// ─── ข้อมูลคนไข้/visit แบบ nested ────────────────────────────────────────────
+function flattenVisits(){
+  const out=[];
+  Object.values(patients).forEach(p=>{
+    Object.values(p.visits||{}).forEach(v=>{
+      out.push({
+        id:v.id, rNo:v.rNo, date:v.date, dn:p.dn, name:p.name, pid:p.pid,
+        age:p.age, birthdate:p.birthdate, tel:p.tel, dentistId:v.dentistId,
+        procedures:(v.items||[]).map(it=>it.procedure),
+        price:v.total, discount:v.discount, payment:v.payment, note:v.note, by:v.by,
+        items:v.items, patientId:p.id, visitId:v.id
+      });
+    });
+  });
+  return out.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||String(b.id).localeCompare(String(a.id)));
+}
+function findOrCreatePatient(dn,name,pid,tel){
+  let p = dn ? Object.values(patients).find(x=>x.dn===dn)
+             : Object.values(patients).find(x=>x.name.trim().toLowerCase()===name.trim().toLowerCase()&&x.pid===pid&&x.tel===tel);
+  const birthdate=document.getElementById('f-birthdate').value;
+  const age=document.getElementById('f-age').value;
+  if(!p){
+    const id='p_'+Date.now();
+    p={id,dn,name,pid,birthdate:birthdate||'',age,tel,createdAt:Date.now(),createdBy:currentUser?currentUser.username:'',visits:{}};
+    patients[id]=p;
+  } else {
+    p.name=name; if(pid)p.pid=pid; if(tel)p.tel=tel;
+    if(birthdate)p.birthdate=birthdate;
+    if(age)p.age=age;
+  }
+  return p;
+}
+function findVisitById(visitId){
+  for(const p of Object.values(patients)){
+    if(p.visits&&p.visits[visitId]) return {patient:p, visit:p.visits[visitId]};
+  }
+  return null;
+}
+
+function addVisit(){const name=document.getElementById('f-name').value.trim();if(!name){toast('กรุณากรอกชื่อคนไข้');return;}if(!document.getElementById('f-dentist').value){toast('กรุณาเลือกทันตแพทย์');return;}if(!currentVisitItems.length){toast('กรุณาเพิ่มรายการหัตถการอย่างน้อย 1 รายการ');return;}
+  const subtotal=currentVisitItems.reduce((s,it)=>s+(it.price||0),0);
+  const discount=parseFloat(document.getElementById('f-discount').value)||0;
+  const dn=document.getElementById('f-dn').value.trim();
+  const pid=document.getElementById('f-pid').value.trim();
+  const tel=document.getElementById('f-tel').value.trim();
+  const patient=findOrCreatePatient(dn,name,pid,tel);
+  const rnoInput=document.getElementById('f-receiptno').value.trim();
+  const rNoVal=rnoInput!==''?rnoInput:rCnt++;
+  const visitId='v_'+Date.now();
+  patient.visits[visitId]={
+    id:visitId, rNo:rNoVal, date:document.getElementById('f-date').value||today,
+    dentistId:parseInt(document.getElementById('f-dentist').value),
+    dentition:chartMode,
+    items:currentVisitItems.map(it=>({...it})),
+    discount, subtotal, total:subtotal-discount,
+    payment:document.getElementById('f-payment').value,
+    note:document.getElementById('f-note').value.trim(),
+    by:currentUser?currentUser.username:''
+  };
+  sp();renderTable();updateStats();clearForm();toast('บันทึกเรียบร้อย');}
+function clearForm(){['f-dn','f-receiptno','f-name','f-pid','f-age','f-birthdate','f-tel','li-price','f-discount','f-note'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-date').value=today;document.getElementById('f-dentist').value='';document.getElementById('f-payment').value='cash';selProcs=[];currentVisitItems=[];document.querySelectorAll('.pq-btn').forEach(b=>b.classList.remove('sel'));setChartMode('adult');renderLineItems();}
+function deleteVisit(visitId){if(currentUser&&currentUser.role!=='admin'){toast('เฉพาะ Admin เท่านั้นที่ลบได้');return;}const found=findVisitById(visitId);if(!found)return;delete found.patient.visits[visitId];if(!Object.keys(found.patient.visits).length)delete patients[found.patient.id];sp();renderTable();updateStats();toast('ลบแล้ว');}
+
+function renderTable(){const q=document.getElementById('search-input').value.toLowerCase();const f=flattenVisits().filter(r=>r.name.toLowerCase().includes(q)||(r.dn&&r.dn.toLowerCase().includes(q)));const isAdmin=currentUser&&currentUser.role==='admin';document.getElementById('empty-state').style.display=f.length?'none':'block';document.getElementById('table-body').innerHTML=f.map(r=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(r.date)}</td><td style="color:var(--text2);font-size:11px;">${r.dn||'-'}</td><td style="font-weight:600;font-size:12px;">${r.name}</td><td style="color:var(--text2);font-size:11px;">${r.age?r.age+'ปี':'-'}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(r.dentistId)}</span></td><td><div class="chips">${r.procedures.map(p=>`<span class="badge ${gpc(p)}">${p}</span>`).join('')}</div></td><td class="price-green">${fp(r.price)}</td><td style="white-space:nowrap;"><button class="btn-sm-teal" onclick="openReceipt('${r.id}')"><i class="ti ti-receipt" style="font-size:12px;"></i>ใบเสร็จ</button>${isAdmin?`<button class="btn-del" onclick="deleteVisit('${r.id}')" style="margin-left:2px;"><i class="ti ti-trash"></i></button>`:''}</td></tr>`).join('');}
+function renderReceiptList(){const q=document.getElementById('receipt-search').value.toLowerCase();const f=flattenVisits().filter(r=>r.name.toLowerCase().includes(q)||(r.dn&&r.dn.toLowerCase().includes(q)));document.getElementById('receipt-empty').style.display=f.length?'none':'block';document.getElementById('receipt-table-body').innerHTML=f.map(r=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(r.date)}</td><td style="color:var(--text2);font-size:11px;">${r.dn||'-'}</td><td style="font-weight:600;font-size:12px;">${r.name}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(r.dentistId)}</span></td><td><div class="chips">${r.procedures.map(p=>`<span class="badge ${gpc(p)}">${p}</span>`).join('')}</div></td><td class="price-green">${fp(r.price)}</td><td><button class="btn-sm-teal" onclick="openReceipt('${r.id}')"><i class="ti ti-receipt" style="font-size:12px;"></i>ออกใบเสร็จ</button></td></tr>`).join('');}
+
+function openReceipt(id){const r=flattenVisits().find(x=>x.id===id);if(!r)return;currentReceiptId=id;document.getElementById('btn-edit-rno').classList.toggle('hidden',!(currentUser&&currentUser.role==='admin'));document.getElementById('r-branch-line').textContent=currentBranch?currentBranch.name+' ('+currentBranch.nameEn+')'+(clinic.tel?' โทร. '+clinic.tel:''):'';document.getElementById('r-book').textContent=clinic.bookNo||'0009';document.getElementById('r-no').textContent=String(r.rNo!==undefined&&r.rNo!==null?r.rNo:r.id).padStart(4,'0');document.getElementById('r-name').textContent=r.name;document.getElementById('r-dn').textContent=r.dn||'-';document.getElementById('r-pid').textContent=r.pid||'-';document.getElementById('r-age').textContent=r.age?r.age+' ปี':'-';document.getElementById('r-date').textContent=fdt(r.date);document.getElementById('r-dentist').textContent=gdn(r.dentistId);document.getElementById('r-cashier').textContent=currentUser?currentUser.name:'';document.getElementById('r-payer').textContent=r.name;
+  const items=r.items||[];const disc=r.discount||0;const subtotal=items.reduce((s,it)=>s+(it.price||0),0);
+  let rows='';
+  items.forEach((it,i)=>{
+    const toothLabel=it.tooth?(' — ซี่ '+it.tooth+((it.surfaces&&it.surfaces.length)?' ('+it.surfaces.join(',')+')':'')):'';
+    rows+=`<tr><td class="tno">${i+1}</td><td>${it.procedure}${toothLabel}${r.note&&i===0?' ('+r.note+')':''}</td><td class="tqty">1</td><td class="tprice">${fn(it.price)}</td><td class="tdisc">-</td><td class="ttotal">${fn(it.price)}</td></tr>`;
+  });
+  for(let i=items.length;i<8;i++)rows+=`<tr class="erow"><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+  document.getElementById('r-items').innerHTML=rows;
+  const net=subtotal-disc;
+  document.getElementById('r-sub').textContent=subtotal?fn(subtotal)+' บาท':'-';
+  document.getElementById('r-disc').textContent=disc?fn(disc)+' บาท':'- บาท';
+  document.getElementById('r-total').textContent=fn(net)+' บาท';
+  document.getElementById('r-baht-text').textContent=baht(net);
+  const pm=r.payment||'cash';['c-cash','c-transfer','c-card','c-sso'].forEach(id=>document.getElementById(id).classList.remove('checked'));document.getElementById('c-'+pm).classList.add('checked');document.getElementById('pay-cash-a').textContent=pm==='cash'&&subtotal?fn(net):'';document.getElementById('pay-transfer-a').textContent=pm==='transfer'&&subtotal?fn(net):'';document.getElementById('pay-card-a').textContent=pm==='card'&&subtotal?fn(net):'';document.getElementById('pay-sso-a').textContent=pm==='sso'&&subtotal?fn(net):'';document.getElementById('receipt-preview-wrap').style.display='block';if(!document.getElementById('page-receipt').classList.contains('active'))switchTab('receipt');setTimeout(()=>document.getElementById('receipt-preview-wrap').scrollIntoView({behavior:'smooth',block:'start'}),100);}
+
+function editReceiptNo(){
+  if(!(currentUser&&currentUser.role==='admin')){toast('เฉพาะ Admin เท่านั้นที่แก้ไขได้');return;}
+  const found=findVisitById(currentReceiptId);if(!found)return;
+  const cur=(found.visit.rNo!==undefined&&found.visit.rNo!==null)?String(found.visit.rNo):'';
+  const val=prompt('แก้ไขเลขที่ใบเสร็จ:',cur);
+  if(val===null)return;
+  const trimmed=val.trim();
+  if(trimmed===''){toast('กรุณากรอกเลขที่ใบเสร็จ');return;}
+  found.visit.rNo=trimmed;
+  sp();
+  document.getElementById('r-no').textContent=String(trimmed).padStart(4,'0');
+  renderTable();renderReceiptList();
+  toast('แก้ไขเลขที่ใบเสร็จเรียบร้อย');
+}
+function closeReceipt(){document.getElementById('receipt-preview-wrap').style.display='none';}
+
+function printReceipt(){const content=document.getElementById('receipt-doc').outerHTML;const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>ใบเสร็จ - วอทเดอะทูธ</title><style>@page{size:A5 portrait;margin:8mm;}*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Sarabun','TH Sarabun New','Angsana New',sans-serif;font-size:12px;background:#fff;color:#000;}#receipt-doc{width:100%;border:1.5px solid #7B68AB;}.r-hdr{display:flex;align-items:flex-start;padding:8px 12px;border-bottom:2px solid #7B68AB;gap:10px;}.r-logo-area{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:80px;}.r-cinfo{flex:1;text-align:right;}.r-cname-th{font-size:14px;font-weight:800;color:#5B3A8A;line-height:1.3;}.r-cname-en{font-size:12px;font-weight:700;color:#5B3A8A;}.r-caddr{font-size:10px;color:#333;margin-top:2px;line-height:1.6;}.r-infobar{background:#7B68AB;color:#fff;display:grid;grid-template-columns:2fr 0.6fr 0.9fr 1.2fr;}.r-ic{padding:5px 8px;border-right:1px solid rgba(255,255,255,0.2);}.r-ic:last-child{border-right:none;position:relative;}.r-il{font-size:9px;opacity:0.85;margin-bottom:1px;}.r-iv{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.r-stamp{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#5B3A8A;color:#fff;border:2px solid #fff;border-radius:4px;padding:3px 7px;font-size:10px;font-weight:800;text-align:center;line-height:1.4;}.r-patient{display:grid;grid-template-columns:1.2fr 0.8fr;border-bottom:1px solid #bbb;}.r-pc{padding:5px 10px;}.r-pc:first-child{border-right:1px solid #bbb;}.r-pf{display:flex;align-items:baseline;gap:3px;margin-bottom:3px;font-size:11.5px;}.r-pl{color:#555;white-space:nowrap;min-width:66px;font-size:11px;}.r-pv{font-weight:700;border-bottom:1px solid #aaa;flex:1;padding-bottom:1px;font-size:11.5px;}.r-table{width:100%;border-collapse:collapse;font-size:11.5px;}.r-table th{background:#EDE7F6;border:1px solid #9B8EC4;padding:4px 6px;text-align:center;font-weight:700;font-size:11px;color:#3a1a6a;}.r-table td{border:1px solid #ccc;padding:3px 6px;}.tno{text-align:center;width:26px;}.tqty{text-align:center;width:42px;}.tprice{text-align:right;width:72px;}.tdisc{text-align:right;width:62px;}.ttotal{text-align:right;width:78px;font-weight:700;}.erow td{height:18px;}.r-baht{padding:4px 12px;font-size:11px;color:#3a1a6a;font-style:italic;border-bottom:1px solid #bbb;background:#faf8ff;}.r-bottom{display:flex;font-size:11.5px;}.r-paycol{flex:1;padding:7px 10px;border-right:1.5px solid #bbb;}.r-paytitle{font-weight:700;font-size:11px;color:#5B3A8A;margin-bottom:5px;text-transform:uppercase;}.r-payopt{display:flex;align-items:center;gap:5px;margin-bottom:5px;font-size:11.5px;}.r-circle{width:13px;height:13px;border:1.5px solid #666;border-radius:50%;flex-shrink:0;display:inline-block;}.r-circle.checked{border-color:#5B3A8A;background:#5B3A8A;}.r-payline{border-bottom:1px dotted #aaa;flex:1;margin:0 4px;}.r-payamt{min-width:52px;text-align:right;font-weight:700;font-size:11.5px;}.r-sumcol{width:200px;flex-shrink:0;display:flex;flex-direction:column;}.r-sumrow{display:flex;border-bottom:1px solid #ddd;font-size:11.5px;}.r-sumrow:last-child{border-bottom:none;}.r-sumlbl{flex:1;padding:4px 8px;color:#444;border-right:1px solid #ddd;font-size:11px;display:flex;align-items:center;}.r-sumval-wrap{display:flex;}.r-sumval{width:70px;padding:4px 6px;text-align:right;font-weight:600;border-right:1px solid #ddd;font-size:11.5px;}.r-sumval:last-child{border-right:none;}.r-grandrow{background:#5B3A8A;color:#fff;font-weight:700;font-size:12px;display:flex;}.r-grandrow .r-sumlbl{color:#fff;border-right-color:rgba(255,255,255,0.3);}.r-grandrow .r-sumval{color:#fff;border-right-color:rgba(255,255,255,0.3);}.r-sig{display:flex;border-top:1px solid #bbb;font-size:12px;text-align:center;}.r-sigbox{flex:1;padding:8px 10px 10px;border-right:1px solid #bbb;display:flex;flex-direction:column;align-items:center;gap:2px;}.r-sigbox:last-child{border-right:none;}.r-sigline{border-bottom:1px solid #999;width:80%;margin:16px auto 4px;}.r-siglbl{color:#666;font-size:11.5px;}.r-signame{font-weight:700;font-size:11px;}.r-wm{display:none;}@media print{body{padding:0;}#receipt-doc{border:none;width:100%;}}</style></head><body>${content}</body></html>`);w.document.close();setTimeout(()=>{w.focus();w.print();},500);}
+
+function updateStats(){const all=flattenVisits();document.getElementById('s-total').textContent=all.length;document.getElementById('s-today').textContent=all.filter(r=>r.date===today).length;document.getElementById('s-proc').textContent=all.reduce((s,r)=>s+r.procedures.length,0);document.getElementById('s-rev').textContent='฿'+all.reduce((s,r)=>s+(r.price||0),0).toLocaleString('th-TH');}
+function addUser(){const u=document.getElementById('nu-user').value.trim(),p=document.getElementById('nu-pass').value.trim();if(!u||!p){toast('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');return;}if(users.find(x=>x.username===u)){toast('ชื่อผู้ใช้นี้มีอยู่แล้ว');return;}users.push({id:Date.now(),username:u,password:p,name:document.getElementById('nu-name').value.trim()||u,role:document.getElementById('nu-role').value});su();renderUserList();['nu-user','nu-pass','nu-name'].forEach(id=>document.getElementById(id).value='');toast('เพิ่มผู้ใช้เรียบร้อย');}
+function delUser(id){if(currentUser&&currentUser.id===id){toast('ไม่สามารถลบบัญชีตัวเองได้');return;}users=users.filter(u=>u.id!==id);su();renderUserList();}
+function renderUserList(){const el=document.getElementById('user-list');if(!users.length){el.innerHTML='<div class="empty"><i class="ti ti-user-off"></i>ไม่มีผู้ใช้</div>';return;}el.innerHTML=users.map(u=>`<div class="u-row"><div class="row-inner"><div class="u-av ${u.role==='staff'?'staff':''}">${(u.name||u.username).slice(0,2).toUpperCase()}</div><div><div style="font-size:13px;font-weight:600;">${u.name||u.username} <span class="badge ${u.role==='admin'?'bp':'bt'}" style="margin-left:4px;">${u.role==='admin'?'Admin':'Staff'}</span></div><div style="font-size:11px;color:var(--text2);">@${u.username}</div></div></div><div style="display:flex;gap:4px;align-items:center;"><button class="btn-del" onclick="changePassword(${u.id})" title="เปลี่ยนรหัสผ่าน" style="color:var(--purple);"><i class="ti ti-key"></i></button>${u.id!==1?`<button class="btn-del" onclick="delUser(${u.id})"><i class="ti ti-trash"></i></button>`:'<span style="font-size:11px;color:var(--text3);">ค่าเริ่มต้น</span>'}</div></div>`).join('');}
+function changePassword(id){
+  const u=users.find(x=>x.id===id);if(!u)return;
+  const p1=prompt('ตั้งรหัสผ่านใหม่สำหรับ @'+u.username+' :');
+  if(p1===null)return;
+  if(!p1.trim()){toast('กรุณากรอกรหัสผ่าน');return;}
+  const p2=prompt('กรอกรหัสผ่านใหม่อีกครั้งเพื่อยืนยัน:');
+  if(p2===null)return;
+  if(p1.trim()!==p2.trim()){toast('รหัสผ่านไม่ตรงกัน กรุณาทำใหม่');return;}
+  u.password=p1.trim();su();toast('เปลี่ยนรหัสผ่านเรียบร้อย');
+}
+
+function setDashRange(mode){
+  const d=new Date();
+  if(mode==='today'){
+    document.getElementById('dash-start').value=today;
+    document.getElementById('dash-end').value=today;
+  }else if(mode==='month'){
+    const first=new Date(d.getFullYear(),d.getMonth(),1).toISOString().split('T')[0];
+    document.getElementById('dash-start').value=first;
+    document.getElementById('dash-end').value=today;
+  }
+  renderDashboard();
+}
+function renderDashboard(){
+  if(!(currentUser&&currentUser.role==='admin'))return;
+  const start=document.getElementById('dash-start').value;
+  const end=document.getElementById('dash-end').value;
+  const f=flattenVisits().filter(r=>{
+    if(start&&r.date<start)return false;
+    if(end&&r.date>end)return false;
+    return true;
+  });
+  const pIds=new Set(f.map(r=>r.patientId||r.id));
+  document.getElementById('dash-total-patients').textContent=pIds.size;
+  document.getElementById('dash-total-procs').textContent=f.reduce((s,r)=>s+((r.procedures||r.items||[]).length),0);
+  document.getElementById('dash-total-rev').textContent='฿'+f.reduce((s,r)=>s+(r.price||r.total||0),0).toLocaleString('th-TH');
+  const byDayDoc={};
+  f.forEach(r=>{
+    const key=r.date+'|'+r.dentistId;
+    if(!byDayDoc[key])byDayDoc[key]={date:r.date,dentistId:r.dentistId,pIds:new Set(),procs:0,rev:0};
+    byDayDoc[key].pIds.add(r.patientId||r.id);
+    byDayDoc[key].procs+=(r.procedures||r.items||[]).length;
+    byDayDoc[key].rev+=(r.price||r.total||0);
+  });
+  const rows=Object.values(byDayDoc).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0);
+  document.getElementById('dash-empty').style.display=rows.length?'none':'block';
+  document.getElementById('dash-table-body').innerHTML=rows.map(x=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(x.date)}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(x.dentistId)}</span></td><td>${x.pIds.size}</td><td>${x.procs}</td><td class="price-green">${fp(x.rev)}</td></tr>`).join('');
+  const byDoc={};
+  f.forEach(r=>{
+    const key=r.dentistId;
+    if(!byDoc[key])byDoc[key]={dentistId:r.dentistId,pIds:new Set(),procs:0,rev:0};
+    byDoc[key].pIds.add(r.patientId||r.id);
+    byDoc[key].procs+=(r.procedures||r.items||[]).length;
+    byDoc[key].rev+=(r.price||r.total||0);
+  });
+  const sumRows=Object.values(byDoc).sort((a,b)=>b.rev-a.rev);
+  document.getElementById('dash-summary-empty').style.display=sumRows.length?'none':'block';
+  document.getElementById('dash-summary-body').innerHTML=sumRows.map(x=>`<tr><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(x.dentistId)}</span></td><td>${x.pIds.size}</td><td>${x.procs}</td><td class="price-green">${fp(x.rev)}</td></tr>`).join('');
+
+  // ─── สรุปยอดตามวิธีชำระเงิน ───────────────────────────────────────────────
+  const payTotals={cash:0,transfer:0,card:0,sso:0};
+  const payCounts={cash:0,transfer:0,card:0,sso:0};
+  f.forEach(r=>{
+    const k=r.payment||'cash';
+    if(payTotals[k]===undefined)return;
+    payTotals[k]+=(r.price||r.total||0);
+    payCounts[k]+=1;
+  });
+  ['cash','transfer','card','sso'].forEach(k=>{
+    document.getElementById('dash-pay-'+k).textContent=fp(payTotals[k]);
+    document.getElementById('dash-pay-'+k+'-cnt').textContent=payCounts[k]+' ครั้ง';
+  });
+
+  // ─── คนไข้จองโปรโมชั่นจัดฟันใหม่ แยกตามเดือน ─────────────────────────────
+  const orthoByMonth={};
+  f.forEach(r=>{
+    if(!(r.procedures||[]).includes(ORTHO_PROMO_PROC))return;
+    const month=(r.date||'').slice(0,7);
+    if(!month)return;
+    if(!orthoByMonth[month])orthoByMonth[month]={month,patients:new Map()};
+    orthoByMonth[month].patients.set(r.patientId||r.id, r.name);
+  });
+  const orthoRows=Object.values(orthoByMonth).sort((a,b)=>b.month.localeCompare(a.month));
+  document.getElementById('dash-ortho-empty').style.display=orthoRows.length?'none':'block';
+  document.getElementById('dash-ortho-body').innerHTML=orthoRows.map(x=>{
+    const names=[...x.patients.values()];
+    return `<tr><td style="font-weight:600;">${fmtMonthTH(x.month)}</td><td class="price-green" style="font-weight:700;">${x.patients.size} คน</td><td style="font-size:11px;">${names.join(', ')||'-'}</td></tr>`;
+  }).join('');
+}
+
+let toastTimer;
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);}
+
+
+</script>
+</head>
+<body>
+
+
+
+<!-- LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-icon" style="background:transparent;width:80px;height:80px;"><img src="data:image/png;base64,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" style="width:100%;height:100%;object-fit:contain;"></div>
+      <div class="login-name">คลินิกทันตกรรม วอทเดอะทูธ</div>
+      <div class="login-sub">What The Tooth Dental Clinic</div>
+    </div>
+
+    <div class="branch-section">
+      <span class="branch-label">เลือกสาขา</span>
+      <div class="branch-grid">
+        <button class="branch-btn" data-branch="branch1" onclick="selectBranch('branch1')">
+          <div class="b-icon">🏥</div>
+          <div class="b-name">สาขาเทพารักษ์</div>
+          <div class="b-sub">Thepharak Branch</div>
+        </button>
+        <button class="branch-btn" data-branch="branch2" onclick="selectBranch('branch2')">
+          <div class="b-icon">🏥</div>
+          <div class="b-name">สาขาศรีนครินทร์</div>
+          <div class="b-sub">Srinakarin Branch</div>
+        </button>
+      </div>
+    </div>
+
+    <div class="login-field"><label>ชื่อผู้ใช้</label><input type="text" id="login-user" placeholder="username" autocomplete="off"></div>
+    <div class="login-field"><label>รหัสผ่าน</label><input type="password" id="login-pass" placeholder="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="login-err" id="login-err"></div>
+    <button class="btn-login" onclick="doLogin()"><i class="ti ti-login" style="font-size:15px;"></i>เข้าสู่ระบบ</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-screen hidden" id="app-screen" style="display:flex;flex-direction:column;min-height:100vh;">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-icon" id="tb-icon" style="background:transparent;border-radius:4px;overflow:hidden;"><img src="data:image/png;base64,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" style="width:34px;height:34px;object-fit:contain;border-radius:4px;"></div>
+      <div class="topbar-texts">
+        <div class="topbar-name">คลินิกทันตกรรม วอทเดอะทูธ</div>
+        <span class="branch-badge" id="tb-branch-badge"></span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-chip"><i class="ti ti-user-circle" style="font-size:14px;"></i><span id="topbar-user"></span><span id="topbar-role" class="role-tag"></span></div>
+      <button class="btn-out" onclick="doSignOut()"><i class="ti ti-logout" style="font-size:13px;"></i>ออกจากระบบ</button>
+    </div>
+  </div>
+
+  <div class="tab-row" id="tab-row">
+    <button class="tab-btn active" onclick="switchTab('record')" id="tab-record"><i class="ti ti-clipboard-list" style="font-size:15px;"></i>บันทึกคนไข้</button>
+    <button class="tab-btn" onclick="switchTab('receipt')" id="tab-receipt"><i class="ti ti-receipt" style="font-size:15px;"></i>ออกใบเสร็จ</button>
+    <button class="tab-btn" onclick="switchTab('dentists')" id="tab-dentists"><i class="ti ti-stethoscope" style="font-size:15px;"></i>ทันตแพทย์</button>
+    <button class="tab-btn admin-only hidden" onclick="switchTab('admin')" id="tab-admin"><i class="ti ti-shield-lock" style="font-size:15px;"></i>Admin</button>
+    <button class="tab-btn admin-only hidden" onclick="switchTab('dashboard')" id="tab-dashboard"><i class="ti ti-chart-bar" style="font-size:15px;"></i>Dashboard</button>
+    <button class="tab-btn admin-only hidden" onclick="switchTab('settings')" id="tab-settings"><i class="ti ti-settings" style="font-size:15px;"></i>ตั้งค่า</button>
+  </div>
+
+  <div class="content">
+
+    <!-- บันทึกคนไข้ -->
+    <div id="page-record" class="page active">
+      <div class="stats">
+        <div class="stat"><div class="stat-lbl"><i class="ti ti-users" style="font-size:13px;"></i>คนไข้ทั้งหมด</div><div class="stat-val" id="s-total">0</div></div>
+        <div class="stat"><div class="stat-lbl"><i class="ti ti-calendar-today" style="font-size:13px;"></i>วันนี้</div><div class="stat-val" id="s-today">0</div></div>
+        <div class="stat"><div class="stat-lbl"><i class="ti ti-activity" style="font-size:13px;"></i>หัตถการรวม</div><div class="stat-val" id="s-proc">0</div></div>
+        <div class="stat"><div class="stat-lbl"><i class="ti ti-currency-baht" style="font-size:13px;"></i>รายได้รวม</div><div class="stat-val" id="s-rev">฿0</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-plus" style="font-size:15px;color:var(--green);"></i>เพิ่มคนไข้ใหม่</div>
+        <div class="grid2">
+          <div class="field"><label>วันที่</label><input type="date" id="f-date"></div>
+          <div class="field"><label>DN</label><input type="text" id="f-dn" placeholder="เช่น 12345"></div>
+          <div class="field"><label>เลขที่ใบเสร็จ</label><input type="text" id="f-receiptno" placeholder="เว้นว่าง = อัตโนมัติ"></div>
+          <div class="field"><label>ชื่อ-นามสกุล <span class="req">*</span></label><input type="text" id="f-name" placeholder="ชื่อคนไข้"></div>
+          <div class="field"><label>เลขบัตรประชาชน</label><input type="text" id="f-pid" placeholder="13 หลัก" maxlength="13"></div>
+          <div class="field"><label>อายุ</label><input type="number" id="f-age" placeholder="ปี" min="0" max="150"></div>
+          <div class="field"><label>วันเกิด</label><input type="date" id="f-birthdate"></div>
+          <div class="field"><label>เบอร์โทร</label><input type="text" id="f-tel" placeholder="0xx-xxx-xxxx"></div>
+          <div class="field full"><label>ทันตแพทย์ผู้ทำการรักษา <span class="req">*</span></label><select id="f-dentist"><option value="">-- เลือกทันตแพทย์ --</option></select></div>
+        </div>
+
+        <div class="li-builder">
+          <div class="field full">
+            <label>เลือกหัตถการ <span class="req">*</span></label>
+            <div class="proc-groups" id="proc-quick" style="margin-bottom:6px;"></div>
+          </div>
+          <div class="field full">
+            <label>ผังฟัน (FDI Notation 11-48 — คลิกเลือกซี่ฟัน แล้วเลือกด้านฟัน — ไม่บังคับ)</label>
+            <div class="chart-toggle">
+              <button type="button" class="pq-btn sel" id="btn-mode-adult" onclick="setChartMode('adult')">ฟันแท้ (ผู้ใหญ่)</button>
+              <button type="button" class="pq-btn" id="btn-mode-child" onclick="setChartMode('child')">ฟันน้ำนม (เด็ก)</button>
+            </div>
+            <div class="tooth-chart" id="tooth-chart"></div>
+            <div class="surface-picker" id="surface-picker"></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>ราคารายการนี้ (บาท)</label><div class="price-wrap"><span class="baht">฿</span><input type="number" id="li-price" placeholder="0" min="0"></div></div>
+            <div class="field" style="justify-content:flex-end;">
+              <button type="button" class="btn-green" onclick="addLineItem()" style="width:100%;justify-content:center;"><i class="ti ti-plus" style="font-size:15px;"></i>เพิ่มรายการ</button>
+            </div>
+          </div>
+          <div class="field full">
+            <label>รายการหัตถการที่เพิ่มแล้ว</label>
+            <div class="scroll-x">
+              <table class="li-table"><thead><tr><th>หัตถการ</th><th style="width:70px;">ซี่ฟัน</th><th style="width:130px;">ด้าน</th><th style="width:90px;">ราคา</th><th style="width:40px;"></th></tr></thead>
+                <tbody id="line-items-body"></tbody></table>
+            </div>
+            <div class="empty" id="li-empty" style="padding:1rem;">ยังไม่มีรายการ</div>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="field"><label>ส่วนลดรวม (บาท)</label><div class="price-wrap"><span class="baht">฿</span><input type="number" id="f-discount" placeholder="0" min="0" oninput="updateVisitTotals()"></div></div>
+          <div class="field"><label>ยอดสุทธิ</label><div class="stat-val" id="visit-net" style="font-size:20px;">฿0</div></div>
+          <div class="field"><label>วิธีชำระเงิน</label><select id="f-payment"><option value="cash">เงินสด</option><option value="transfer">โอนเงิน</option><option value="card">บัตรเครดิต</option><option value="sso">ประกันสังคม</option></select></div>
+          <div class="field"><label>หมายเหตุ</label><input type="text" id="f-note" placeholder="หมายเหตุเพิ่มเติม..."></div>
+        </div>
+        <div class="row-btns">
+          <button class="btn-green" onclick="addVisit()"><i class="ti ti-device-floppy" style="font-size:15px;"></i>บันทึก</button>
+          <button class="btn-ghost" onclick="clearForm()">ล้างข้อมูล</button>
+        </div>
+      </div>
+      <div class="tcard">
+        <div class="tcard-hdr">
+          <div class="tcard-title"><i class="ti ti-list" style="font-size:14px;"></i>รายการคนไข้ <span id="branch-indicator" class="branch-badge" style="margin-left:6px;"></span></div>
+          <div class="search-wrap"><i class="ti ti-search"></i><input type="text" id="search-input" placeholder="ค้นหาชื่อ หรือ DN..." oninput="renderTable()"></div>
+        </div>
+        <div class="scroll-x">
+          <table><thead><tr>
+            <th style="width:72px;">วันที่</th><th style="width:60px;">DN</th><th style="width:110px;">ชื่อ-นามสกุล</th>
+            <th style="width:44px;">อายุ</th><th style="width:115px;">ทันตแพทย์</th><th style="width:155px;">หัตถการ</th>
+            <th style="width:72px;">ราคา</th><th style="width:82px;"></th>
+          </tr></thead><tbody id="table-body"></tbody></table>
+          <div class="empty" id="empty-state" style="display:none;"><i class="ti ti-clipboard-x"></i>ยังไม่มีข้อมูลคนไข้</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ออกใบเสร็จ -->
+    <div id="page-receipt" class="page">
+      <div class="tcard">
+        <div class="tcard-hdr">
+          <div class="tcard-title"><i class="ti ti-receipt" style="font-size:14px;"></i>เลือกคนไข้เพื่อออกใบเสร็จ</div>
+          <div class="search-wrap"><i class="ti ti-search"></i><input type="text" id="receipt-search" placeholder="ค้นหา..." oninput="renderReceiptList()"></div>
+        </div>
+        <div class="scroll-x">
+          <table><thead><tr>
+            <th style="width:72px;">วันที่</th><th style="width:62px;">DN</th><th style="width:125px;">ชื่อ-นามสกุล</th>
+            <th style="width:120px;">ทันตแพทย์</th><th style="width:165px;">หัตถการ</th><th style="width:74px;">ราคา</th><th style="width:92px;"></th>
+          </tr></thead><tbody id="receipt-table-body"></tbody></table>
+          <div class="empty" id="receipt-empty" style="display:none;"><i class="ti ti-clipboard-x"></i>ยังไม่มีข้อมูล</div>
+        </div>
+      </div>
+      <div id="receipt-preview-wrap" style="display:none;">
+        <div class="receipt-bg">
+          <div id="receipt-doc">
+            <div class="r-wm">W</div>
+            <!-- หัว: โลโก้ซ้าย, ข้อมูลคลินิกขวา -->
+            <div class="r-hdr">
+              <div class="r-logo-area" style="width:80px;">
+                <img src="data:image/png;base64,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" style="width:80px;height:80px;object-fit:contain;">
+              </div>
+              <div class="r-cinfo">
+                <div class="r-cname-th">คลินิกทันตกรรม วอทเดอะทูธ</div>
+                <div class="r-cname-en">WHAT THE TOOTH DENTAL CLINIC</div>
+                <div class="r-caddr">บริษัท วิชชั่นเดนท์ จำกัด (สำนักงานใหญ่)</div>
+                <div class="r-caddr">6/172 หมู่ที่ 7 ถนนศรีครินทร์ ตำบลบางเมือง อำเภอเมืองสมุทรปราการ จังหวัดสมุทรปราการ 10270</div>
+                <div class="r-caddr">เลขประจำตัวผู้เสียภาษี 0105563034860 โทร 080-416-3991</div>
+                <div class="r-caddr" id="r-branch-line"></div>
+              </div>
+            </div>
+            <!-- แถบสีม่วง: ชื่อ / อายุ / วันที่ / เลขที่+เล่มที่+ตรา -->
+            <div class="r-infobar">
+              <div class="r-ic">
+                <div class="r-il">ชื่อ-นามสกุล / Name</div>
+                <div class="r-iv" id="r-name"></div>
+              </div>
+              <div class="r-ic">
+                <div class="r-il">อายุ / Age</div>
+                <div class="r-iv" id="r-age"></div>
+              </div>
+              <div class="r-ic">
+                <div class="r-il">วันที่ / Date</div>
+                <div class="r-iv" id="r-date"></div>
+              </div>
+              <div class="r-ic" style="position:relative;">
+                <div class="r-il">เลขที่ <span id="r-no"></span> เล่มที่ <span id="r-book">0009</span>
+                  <button class="btn-del admin-only hidden" id="btn-edit-rno" onclick="editReceiptNo()" style="color:rgba(255,255,255,0.8);padding:0 2px;" title="แก้ไขเลขที่"><i class="ti ti-pencil" style="font-size:11px;"></i></button>
+                </div>
+                <div class="r-stamp">ใบเสร็จ<br>รับเงิน</div>
+              </div>
+            </div>
+            <!-- ข้อมูลคนไข้เพิ่มเติม -->
+            <div class="r-patient">
+              <div class="r-pc">
+                <div class="r-pf"><span class="r-pl">DN</span><span class="r-pv" id="r-dn"></span></div>
+                <div class="r-pf"><span class="r-pl">เลขบัตรประชาชน</span><span class="r-pv" id="r-pid"></span></div>
+              </div>
+              <div class="r-pc">
+                <div class="r-pf"><span class="r-pl">ทันตแพทย์</span><span class="r-pv" id="r-dentist"></span></div>
+              </div>
+            </div>
+            <!-- ตารางรายการ -->
+            <table class="r-table">
+              <thead><tr>
+                <th class="tno">ลำดับ</th>
+                <th>รายการหัตถการ</th>
+                <th class="tqty">จำนวน</th>
+                <th class="tprice">ราคา/หน่วย</th>
+                <th class="tdisc">ส่วนลด</th>
+                <th class="ttotal">รวมเงิน</th>
+              </tr></thead>
+              <tbody id="r-items"></tbody>
+            </table>
+            <!-- จำนวนเงินเป็นตัวอักษร -->
+            <div class="r-baht">( <span id="r-baht-text"></span> )</div>
+            <!-- ส่วนล่าง: ชำระเงิน + สรุป -->
+            <div class="r-bottom">
+              <!-- วิธีชำระ: วงกลม○ -->
+              <div class="r-paycol">
+                <div class="r-paytitle">วิธีชำระเงิน / Payment</div>
+                <div class="r-payopt"><span class="r-circle" id="c-cash"></span><span>เงินสด</span><span class="r-payline"></span><span class="r-payamt" id="pay-cash-a"></span></div>
+                <div class="r-payopt"><span class="r-circle" id="c-transfer"></span><span>โอนเงิน</span><span class="r-payline"></span><span class="r-payamt" id="pay-transfer-a"></span></div>
+                <div class="r-payopt"><span class="r-circle" id="c-card"></span><span>บัตรเครดิต</span><span class="r-payline"></span><span class="r-payamt" id="pay-card-a"></span></div>
+                <div class="r-payopt"><span class="r-circle" id="c-sso"></span><span>ประกันสังคม</span><span class="r-payline"></span><span class="r-payamt" id="pay-sso-a"></span></div>
+              </div>
+              <!-- สรุปยอด 3 คอลัมน์ -->
+              <div class="r-sumcol">
+                <div class="r-sumrow">
+                  <span class="r-sumlbl">รวมเงิน</span>
+                  <div class="r-sumval-wrap">
+                    <span class="r-sumval" id="r-sub"></span>
+                    <span class="r-sumval" id="r-sub2"></span>
+                  </div>
+                </div>
+                <div class="r-sumrow">
+                  <span class="r-sumlbl">ส่วนลด</span>
+                  <div class="r-sumval-wrap">
+                    <span class="r-sumval" id="r-disc"></span>
+                    <span class="r-sumval" id="r-disc2"></span>
+                  </div>
+                </div>
+                <div class="r-sumrow r-grandrow">
+                  <span class="r-sumlbl">ยอดสุทธิ</span>
+                  <div class="r-sumval-wrap">
+                    <span class="r-sumval" id="r-total"></span>
+                    <span class="r-sumval" id="r-total2"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- ลายเซ็น -->
+            <div class="r-sig">
+              <div class="r-sigbox">
+                <div class="r-sigline"></div>
+                <div class="r-siglbl">ผู้รับเงิน / Cashier</div>
+                <div class="r-signame" id="r-cashier"></div>
+              </div>
+              <div class="r-sigbox">
+                <div class="r-sigline"></div>
+                <div class="r-siglbl">ผู้จ่ายเงิน / Patient</div>
+                <div class="r-signame" id="r-payer"></div>
+              </div>
+            </div>
+          </div>
+          <div class="receipt-actions">
+            <button class="btn-green" onclick="printReceipt()"><i class="ti ti-printer" style="font-size:15px;"></i>พิมพ์ใบเสร็จ</button>
+            <button class="btn-ghost" onclick="closeReceipt()">ปิด</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ทันตแพทย์ -->
+    <div id="page-dentists" class="page">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-user-plus" style="font-size:15px;color:var(--green);"></i>เพิ่มทันตแพทย์</div>
+        <div class="grid2">
+          <div class="field"><label>ชื่อ <span class="req">*</span></label><input type="text" id="d-fname" placeholder="ชื่อ"></div>
+          <div class="field"><label>นามสกุล <span class="req">*</span></label><input type="text" id="d-lname" placeholder="นามสกุล"></div>
+          <div class="field"><label>เลขใบอนุญาต</label><input type="text" id="d-license" placeholder="เช่น ท.12345"></div>
+          <div class="field"><label>ความเชี่ยวชาญ</label><input type="text" id="d-spec" placeholder="เช่น ทันตกรรมทั่วไป"></div>
+        </div>
+        <div class="row-btns"><button class="btn-green" onclick="addDentist()"><i class="ti ti-user-plus" style="font-size:15px;"></i>เพิ่ม</button></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-users" style="font-size:15px;color:var(--green);"></i>รายชื่อทันตแพทย์</div>
+        <div id="dentist-list"><div class="empty"><i class="ti ti-user-off"></i>ยังไม่มีทันตแพทย์</div></div>
+      </div>
+    </div>
+
+    <!-- Admin -->
+    <div id="page-admin" class="page">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-user-plus" style="font-size:15px;color:var(--green);"></i>เพิ่มผู้ใช้งาน</div>
+        <div class="grid2">
+          <div class="field"><label>ชื่อผู้ใช้ <span class="req">*</span></label><input type="text" id="nu-user" placeholder="username"></div>
+          <div class="field"><label>รหัสผ่าน <span class="req">*</span></label><input type="password" id="nu-pass" placeholder="password"></div>
+          <div class="field"><label>ชื่อ-นามสกุล</label><input type="text" id="nu-name" placeholder="ชื่อแสดง"></div>
+          <div class="field"><label>บทบาท</label><select id="nu-role"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
+        </div>
+        <div class="row-btns"><button class="btn-green" onclick="addUser()"><i class="ti ti-user-plus" style="font-size:15px;"></i>เพิ่มผู้ใช้</button></div>
+      </div>
+      <div class="tcard">
+        <div class="tcard-hdr"><div class="tcard-title"><i class="ti ti-users" style="font-size:14px;"></i>รายชื่อผู้ใช้งาน</div></div>
+        <div id="user-list"></div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="page-dashboard" class="page">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-calendar" style="font-size:15px;color:var(--green);"></i>เลือกช่วงเวลา</div>
+        <div class="grid2">
+          <div class="field"><label>วันที่เริ่ม</label><input type="date" id="dash-start"></div>
+          <div class="field"><label>วันที่สิ้นสุด</label><input type="date" id="dash-end"></div>
+        </div>
+        <div class="row-btns">
+          <button class="btn-green" onclick="setDashRange('today')"><i class="ti ti-calendar-event" style="font-size:15px;"></i>วันนี้</button>
+          <button class="btn-ghost" onclick="setDashRange('month')">เดือนนี้</button>
+          <button class="btn-ghost" onclick="renderDashboard()">แสดงผล</button>
+        </div>
+      </div>
+      <div class="stats" id="dash-stats">
+        <div class="stat"><div class="stat-lbl"><i class="ti ti-users" style="font-size:13px;"></i>คนไข้ทั้งหมด</div><div class="stat-val" id="dash-total-patients">0</div></div>
+        <div class="stat"><div class="stat-lbl"><i class="ti ti-activity" style="font-size:13px;"></i>หัตถการรวม</div><div class="stat-val" id="dash-total-procs">0</div></div>
+        <div class="stat"><div class="stat-lbl"><i class="ti ti-currency-baht" style="font-size:13px;"></i>รายได้รวม</div><div class="stat-val" id="dash-total-rev">฿0</div></div>
+      </div>
+      <div class="tcard">
+        <div class="tcard-hdr"><div class="tcard-title"><i class="ti ti-cash" style="font-size:14px;"></i>สรุปยอดตามวิธีชำระเงิน</div></div>
+        <div class="stats" style="padding:0 18px 18px;margin-bottom:0;">
+          <div class="stat"><div class="stat-lbl"><i class="ti ti-cash-banknote" style="font-size:13px;"></i>เงินสด</div><div class="stat-val" id="dash-pay-cash">฿0</div><div class="pay-cnt" id="dash-pay-cash-cnt">0 ครั้ง</div></div>
+          <div class="stat"><div class="stat-lbl"><i class="ti ti-building-bank" style="font-size:13px;"></i>โอนเงิน</div><div class="stat-val" id="dash-pay-transfer">฿0</div><div class="pay-cnt" id="dash-pay-transfer-cnt">0 ครั้ง</div></div>
+          <div class="stat"><div class="stat-lbl"><i class="ti ti-credit-card" style="font-size:13px;"></i>บัตรเครดิต</div><div class="stat-val" id="dash-pay-card">฿0</div><div class="pay-cnt" id="dash-pay-card-cnt">0 ครั้ง</div></div>
+          <div class="stat"><div class="stat-lbl"><i class="ti ti-shield-check" style="font-size:13px;"></i>ประกันสังคม</div><div class="stat-val" id="dash-pay-sso">฿0</div><div class="pay-cnt" id="dash-pay-sso-cnt">0 ครั้ง</div></div>
+        </div>
+      </div>
+      <div class="tcard">
+        <div class="tcard-hdr"><div class="tcard-title"><i class="ti ti-stethoscope" style="font-size:14px;"></i>สรุปยอดตามทันตแพทย์ (ตามวัน)</div></div>
+        <div class="scroll-x">
+          <table><thead><tr>
+            <th style="width:72px;">วันที่</th><th style="width:160px;">ทันตแพทย์</th>
+            <th style="width:80px;">คนไข้</th><th style="width:90px;">หัตถการ</th><th style="width:90px;">รายได้</th>
+          </tr></thead><tbody id="dash-table-body"></tbody></table>
+          <div class="empty" id="dash-empty" style="display:none;"><i class="ti ti-clipboard-x"></i>ไม่มีข้อมูลในช่วงเวลานี้</div>
+        </div>
+      </div>
+      <div class="tcard">
+        <div class="tcard-hdr"><div class="tcard-title"><i class="ti ti-sum" style="font-size:14px;"></i>ยอดรวมต่อทันตแพทย์ (ทั้งช่วงเวลา)</div></div>
+        <div class="scroll-x">
+          <table><thead><tr>
+            <th style="width:200px;">ทันตแพทย์</th>
+            <th style="width:90px;">คนไข้</th><th style="width:90px;">หัตถการ</th><th style="width:100px;">รายได้รวม</th>
+          </tr></thead><tbody id="dash-summary-body"></tbody></table>
+          <div class="empty" id="dash-summary-empty" style="display:none;"><i class="ti ti-clipboard-x"></i>ไม่มีข้อมูลในช่วงเวลานี้</div>
+        </div>
+      </div>
+      <div class="tcard">
+        <div class="tcard-hdr"><div class="tcard-title"><i class="ti ti-align-box-left-middle" style="font-size:14px;"></i>คนไข้จองโปรโมชั่นจัดฟันใหม่ (แยกตามเดือน)</div></div>
+        <div class="scroll-x">
+          <table><thead><tr>
+            <th style="width:130px;">เดือน</th><th style="width:110px;">คนไข้ใหม่</th><th>รายชื่อคนไข้</th>
+          </tr></thead><tbody id="dash-ortho-body"></tbody></table>
+          <div class="empty" id="dash-ortho-empty" style="display:none;"><i class="ti ti-clipboard-x"></i>ไม่มีคนไข้จองโปรโมชั่นจัดฟันในช่วงเวลานี้</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ตั้งค่า -->
+    <div id="page-settings" class="page">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-edit" style="font-size:15px;color:var(--green);"></i>ข้อมูลสาขา (แสดงบนใบเสร็จ)</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px;background:var(--bg2);padding:8px 12px;border-radius:var(--radius-sm);">
+          <i class="ti ti-info-circle" style="font-size:13px;margin-right:4px;"></i>กำลังแก้ไขข้อมูลสาขา: <strong id="settings-branch-name"></strong>
+        </div>
+        <div class="grid2">
+          <div class="field full"><label>ที่อยู่สาขา</label><input type="text" id="s-addr" placeholder="เลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด"></div>
+          <div class="field"><label>เบอร์โทรศัพท์</label><input type="text" id="s-tel" placeholder="0x-xxxx-xxxx"></div>
+          <div class="field"><label>เล่มที่ใบเสร็จ</label><input type="text" id="s-bookno" placeholder="เช่น 0009"></div>
+        </div>
+        <div class="row-btns"><button class="btn-green" onclick="saveSettings()"><i class="ti ti-check" style="font-size:15px;"></i>บันทึก</button></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+
+
+</body>
+</html>E html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>คลินิกทันตกรรม วอทเดอะทูธ</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F6F6F9; --bg2: #EEEDF3; --surface: #FFFFFF;
+  --border: #E3E1EA; --border2: #D1CEDC;
+  --text: #201C2B; --text2: #6C6878; --text3: #A29EAF;
+  --green: #4C2E8C; --green2: #372169; --green-light: #F1ECFB;
+  --purple: #4C2E8C; --purple2: #372169; --purple-light: #F1ECFB;
+  --red: #B23434; --red-light: #FCEBEB;
+  --branch1: #1A5276; --branch1-light: #D6EAF8;
+  --branch2: #1D6A4C; --branch2-light: #D5F5E3;
+  --radius: 14px; --radius-sm: 9px;
+  --shadow: 0 1px 2px rgba(32,20,60,0.05), 0 1px 1px rgba(32,20,60,0.04);
+  --shadow-md: 0 10px 28px rgba(32,20,60,0.10), 0 2px 6px rgba(32,20,60,0.05);
+}
+body { font-family: 'Sarabun','Noto Sans Thai',sans-serif; background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+.hidden { display: none !important; }
+
+/* LOGIN */
+.login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); padding: 1rem; }
+.login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 2.25rem 2rem; width: 100%; max-width: 400px; box-shadow: var(--shadow-md); }
+.login-brand { text-align: center; margin-bottom: 1.5rem; }
+.login-icon { width: 56px; height: 56px; background: var(--purple-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+.login-icon i { font-size: 28px; color: var(--purple); }
+.login-name { font-size: 17px; font-weight: 700; color: var(--text); }
+.login-sub { font-size: 12px; color: var(--text2); margin-top: 3px; }
+
+/* BRANCH SELECT */
+.branch-section { margin-bottom: 18px; }
+.branch-label { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 8px; letter-spacing: 0.3px; display: block; }
+.branch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.branch-btn { border: 2px solid var(--border); border-radius: 10px; padding: 14px 10px; cursor: pointer; background: var(--bg); transition: all 0.15s; text-align: center; font-family: inherit; }
+.branch-btn:hover { border-color: var(--purple); background: var(--purple-light); }
+.branch-btn.selected { border-color: var(--purple); background: var(--purple-light); }
+.branch-btn .b-icon { font-size: 22px; margin-bottom: 5px; }
+.branch-btn .b-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.branch-btn .b-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.branch-btn.selected .b-name { color: var(--purple); }
+.branch-btn[data-branch="branch1"]:hover,.branch-btn[data-branch="branch1"].selected { border-color: var(--branch1); background: var(--branch1-light); }
+.branch-btn[data-branch="branch1"].selected .b-name { color: var(--branch1); }
+.branch-btn[data-branch="branch2"]:hover,.branch-btn[data-branch="branch2"].selected { border-color: var(--branch2); background: var(--branch2-light); }
+.branch-btn[data-branch="branch2"].selected .b-name { color: var(--branch2); }
+
+.login-field { margin-bottom: 13px; }
+.login-field label { font-size: 12px; font-weight: 600; color: var(--text2); display: block; margin-bottom: 5px; }
+.login-field input { width: 100%; font-size: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg); color: var(--text); outline: none; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.login-field input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(76,46,140,0.14); background: var(--surface); }
+.login-err { font-size: 12px; color: var(--red); background: var(--red-light); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 13px; display: none; }
+.login-err.show { display: block; }
+.btn-login { width: 100%; background: var(--green); color: #fff; border: none; border-radius: var(--radius-sm); padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; font-family: inherit; transition: background 0.15s, transform 0.1s, box-shadow 0.15s; box-shadow: 0 4px 12px rgba(76,46,140,0.22); }
+.btn-login:hover { background: var(--green2); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(76,46,140,0.28); }
+.btn-login:active { transform: translateY(0); }
+.login-hint { font-size: 11px; color: var(--text3); text-align: center; margin-top: 12px; }
+
+/* TOPBAR */
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 56px; flex-shrink: 0; box-shadow: var(--shadow); gap: 8px; }
+.topbar-brand { display: flex; align-items: center; gap: 10px; }
+.topbar-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.topbar-icon.b1 { background: var(--branch1-light); }
+.topbar-icon.b2 { background: var(--branch2-light); }
+.topbar-icon i { font-size: 17px; }
+.topbar-icon.b1 i { color: var(--branch1); }
+.topbar-icon.b2 i { color: var(--branch2); }
+.topbar-texts {}
+.topbar-name { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.branch-badge { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 20px; display: inline-block; }
+.branch-badge.b1 { background: var(--branch1-light); color: var(--branch1); }
+.branch-badge.b2 { background: var(--branch2-light); color: var(--branch2); }
+.topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.user-chip { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text2); background: var(--bg2); border-radius: 20px; padding: 4px 10px; }
+.role-tag { font-size: 10px; padding: 1px 7px; border-radius: 20px; font-weight: 600; }
+.role-admin { background: var(--purple-light); color: var(--purple); }
+.role-staff { background: var(--green-light); color: var(--green2); }
+.btn-out { background: transparent; border: 1px solid var(--border); color: var(--text2); border-radius: var(--radius-sm); padding: 5px 11px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-family: inherit; transition: all 0.15s; }
+.btn-out:hover { background: var(--red-light); color: var(--red); border-color: #f09595; }
+
+/* TABS */
+.tab-row { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; overflow-x: auto; }
+.tab-btn { font-size: 13px; font-weight: 500; padding: 12px 16px; border: none; background: transparent; color: var(--text2); cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -1px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; transition: color 0.15s; }
+.tab-btn.active { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
+.tab-btn.active.b1-active { color: var(--branch1); border-bottom-color: var(--branch1); }
+.tab-btn.active.b2-active { color: var(--branch2); border-bottom-color: var(--branch2); }
+.tab-btn:hover:not(.active) { color: var(--text); background: var(--bg); }
+
+/* CONTENT */
+.content { flex: 1; padding: 1.5rem; max-width: 1100px; margin: 0 auto; width: 100%; }
+.page { display: none; }
+.page.active { display: block; }
+.stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 1.5rem; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); transition: box-shadow 0.15s, transform 0.15s; }
+.stat:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.stat-lbl { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.3px; margin-bottom: 6px; text-transform: uppercase; display: flex; align-items: center; gap: 5px; }
+.stat-lbl i { color: var(--purple); }
+.stat-val { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.pay-cnt { font-size: 11px; color: var(--text3); margin-top: 3px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.4rem; margin-bottom: 1.25rem; box-shadow: var(--shadow); }
+.card-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 1rem; display: flex; align-items: center; gap: 7px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.full { grid-column: 1/-1; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.2px; }
+.field input, .field select { font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--bg); color: var(--text); width: 100%; outline: none; font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.field input:focus, .field select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(76,46,140,0.12); background: var(--surface); }
+.field input[readonly] { background: var(--bg2); cursor: default; }
+.price-wrap { position: relative; }
+.price-wrap input { padding-left: 22px; }
+.price-wrap .baht { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text2); pointer-events: none; }
+.req { color: #E24B4A; }
+.row-btns { display: flex; gap: 8px; margin-top: 1rem; }
+.proc-groups { display: flex; flex-direction: column; gap: 8px; }
+.proc-group-lbl { font-size: 10px; font-weight: 700; color: var(--text3); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 3px; }
+.proc-group-btns { display: flex; flex-wrap: wrap; gap: 5px; }
+.pq-btn { cursor: pointer; border: 1px solid var(--border); border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; background: var(--bg); color: var(--text2); font-family: inherit; transition: all 0.12s; }
+.pq-btn:hover,.pq-btn.sel { background: var(--green-light); color: var(--green2); border-color: var(--green); font-weight: 600; }
+.pq-btn.ortho:hover,.pq-btn.ortho.sel { background: var(--purple-light); color: var(--purple); border-color: var(--purple); }
+.pq-btn.xray:hover,.pq-btn.xray.sel { background: #FFF3E0; color: #E65100; border-color: #FF9800; }
+.btn-green { background: var(--green); color: #fff; border: none; border-radius: var(--radius-sm); padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; transition: background 0.15s, transform 0.1s; }
+.btn-green:hover { background: var(--green2); transform: translateY(-1px); }
+.btn-green:active { transform: translateY(0); }
+.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; cursor: pointer; font-family: inherit; transition: background 0.15s, border-color 0.15s; }
+.btn-ghost:hover { background: var(--bg2); border-color: var(--border2); }
+.btn-sm-teal { background: var(--green-light); color: var(--green2); border: 1px solid #5DCAA5; border-radius: var(--radius-sm); padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; }
+.btn-sm-teal:hover { background: #9FE1CB; }
+.btn-del { background: none; border: none; cursor: pointer; color: var(--text3); padding: 3px 5px; border-radius: 4px; font-size: 15px; }
+.btn-del:hover { color: var(--red); background: var(--red-light); }
+.tcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 1.25rem; }
+.tcard-hdr { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
+.tcard-title { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.search-wrap { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; background: var(--bg); }
+.search-wrap i { color: var(--text3); font-size: 14px; }
+.search-wrap input { border: none; background: transparent; font-size: 12px; color: var(--text); outline: none; width: 150px; font-family: inherit; }
+.scroll-x { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th { font-size: 11px; font-weight: 700; color: var(--text2); text-align: left; padding: 10px 14px; background: var(--bg2); border-bottom: 1px solid var(--border); letter-spacing: 0.3px; }
+td { font-size: 12px; color: var(--text); padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; word-break: break-word; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg); }
+.empty { text-align: center; padding: 2.5rem; color: var(--text3); font-size: 13px; }
+.empty i { font-size: 30px; display: block; margin-bottom: 8px; }
+.badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 600; }
+.bt{background:#E1F5EE;color:#085041;}.bb{background:#E6F1FB;color:#0C447C;}.bc{background:#FAECE7;color:#712B13;}.bp{background:#EEEDFE;color:#3C3489;}.ba{background:#FAEEDA;color:#633806;}.bpk{background:#FBEAF0;color:#72243E;}.bi{background:#E8EAF6;color:#283593;}.bg{background:#F5F5F5;color:#424242;}
+.chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.price-green { font-weight: 700; color: var(--green); }
+.dentist-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--purple-light); color: var(--purple); border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 9999; white-space: nowrap; }
+.toast.show { opacity: 1; }
+.dentist-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.dentist-row:last-child { border-bottom: none; }
+.dentist-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--purple-light); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--purple); flex-shrink: 0; }
+.row-inner { display: flex; align-items: center; gap: 10px; }
+.u-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.u-row:last-child { border-bottom: none; }
+.u-av { width: 34px; height: 34px; border-radius: 50%; background: var(--purple-light); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--purple); }
+.u-av.staff { background: var(--green-light); color: var(--green2); }
+/* receipt */
+.receipt-bg { background: var(--bg2); border-radius: var(--radius); padding: 1.5rem; }
+.receipt-actions { display: flex; gap: 8px; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap; }
+#receipt-doc { background: #fff; color: #000; font-family: 'Sarabun','TH Sarabun New','Angsana New',sans-serif; font-size: 13px; max-width: 600px; margin: 0 auto; border: 1.5px solid #7B68AB; position: relative; overflow: hidden; }
+#receipt-doc > * { position: relative; z-index: 1; }
+
+/* watermark */
+.r-wm { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-10deg); opacity: 0.06; pointer-events: none; z-index: 0; font-size: 80px; font-weight: 900; color: #5B3A8A; font-family: serif; white-space: nowrap; }
+
+/* header: logo LEFT, clinic info RIGHT */
+.r-hdr { display: flex; align-items: flex-start; padding: 8px 12px; border-bottom: 2px solid #7B68AB; gap: 10px; }
+.r-logo-area { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 72px; }
+.r-logo-circle { width: 60px; height: 60px; border: 3px solid #5B3A8A; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #f5f0fb; position: relative; }
+.r-logo-w { font-size: 28px; font-weight: 900; color: #5B3A8A; font-family: serif; line-height: 1; }
+.r-logo-tooth { position: absolute; bottom: 4px; right: 6px; font-size: 12px; }
+.r-logo-text { font-size: 7px; color: #5B3A8A; font-weight: 700; text-align: center; margin-top: 3px; line-height: 1.4; letter-spacing: 0.3px; }
+.r-cinfo { flex: 1; text-align: right; }
+.r-cname-th { font-size: 14px; font-weight: 800; color: #5B3A8A; line-height: 1.3; }
+.r-cname-en { font-size: 12px; font-weight: 700; color: #5B3A8A; }
+.r-caddr { font-size: 10px; color: #333; margin-top: 2px; line-height: 1.6; }
+
+/* infobar: ชื่อ / อายุ / วันที่ / เลขที่-เล่มที่ */
+.r-infobar { background: #7B68AB; color: #fff; display: grid; grid-template-columns: 2fr 0.6fr 0.9fr 1.2fr; }
+.r-ic { padding: 5px 8px; border-right: 1px solid rgba(255,255,255,0.2); }
+.r-ic:last-child { border-right: none; position: relative; }
+.r-il { font-size: 9px; opacity: 0.85; margin-bottom: 1px; }
+.r-iv { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* stamp */
+.r-stamp { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: #5B3A8A; color: #fff; border: 2px solid #fff; border-radius: 4px; padding: 3px 7px; font-size: 10px; font-weight: 800; text-align: center; line-height: 1.4; }
+
+/* patient info row */
+.r-patient { display: grid; grid-template-columns: 1.2fr 0.8fr; border-bottom: 1px solid #bbb; }
+.r-pc { padding: 5px 10px; }
+.r-pc:first-child { border-right: 1px solid #bbb; }
+.r-pf { display: flex; align-items: baseline; gap: 3px; margin-bottom: 3px; font-size: 11.5px; }
+.r-pl { color: #555; white-space: nowrap; min-width: 66px; font-size: 11px; }
+.r-pv { font-weight: 700; border-bottom: 1px solid #aaa; flex: 1; padding-bottom: 1px; font-size: 11.5px; }
+
+/* table */
+.r-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.r-table th { background: #EDE7F6; border: 1px solid #9B8EC4; padding: 4px 6px; text-align: center; font-weight: 700; font-size: 11px; color: #3a1a6a; }
+.r-table td { border: 1px solid #ccc; padding: 3px 6px; }
+.r-table .tno { text-align: center; width: 26px; }
+.r-table .tqty { text-align: center; width: 42px; }
+.r-table .tprice { text-align: right; width: 72px; }
+.r-table .tdisc { text-align: right; width: 62px; }
+.r-table .ttotal { text-align: right; width: 78px; font-weight: 700; }
+.erow td { height: 18px; }
+
+/* baht text */
+.r-baht { padding: 4px 12px; font-size: 11px; color: #3a1a6a; font-style: italic; border-bottom: 1px solid #bbb; background: #faf8ff; }
+
+/* bottom: payment left, summary right */
+.r-bottom { display: flex; font-size: 11.5px; }
+.r-paycol { flex: 1; padding: 7px 10px; border-right: 1.5px solid #bbb; }
+.r-paytitle { font-weight: 700; font-size: 11px; color: #5B3A8A; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.3px; }
+.r-payopt { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; font-size: 11.5px; }
+.r-circle { width: 13px; height: 13px; border: 1.5px solid #666; border-radius: 50%; flex-shrink: 0; }
+.r-circle.checked { border-color: #5B3A8A; background: #5B3A8A; }
+.r-payline { border-bottom: 1px dotted #aaa; flex: 1; margin: 0 4px; }
+.r-payamt { min-width: 52px; text-align: right; font-weight: 700; font-size: 11.5px; }
+
+/* summary 3 columns like the photo */
+.r-sumcol { width: 200px; flex-shrink: 0; display: flex; flex-direction: column; }
+.r-sumrow { display: flex; border-bottom: 1px solid #ddd; font-size: 11.5px; }
+.r-sumrow:last-child { border-bottom: none; }
+.r-sumlbl { flex: 1; padding: 4px 8px; color: #444; border-right: 1px solid #ddd; font-size: 11px; display: flex; align-items: center; }
+.r-sumval-wrap { display: flex; }
+.r-sumval { width: 70px; padding: 4px 6px; text-align: right; font-weight: 600; border-right: 1px solid #ddd; font-size: 11.5px; }
+.r-sumval:last-child { border-right: none; }
+.r-grandrow { background: #5B3A8A; color: #fff; font-weight: 700; font-size: 12px; display: flex; }
+.r-grandrow .r-sumlbl { color: #fff; border-right-color: rgba(255,255,255,0.3); }
+.r-grandrow .r-sumval { color: #fff; border-right-color: rgba(255,255,255,0.3); }
+
+/* signature */
+.r-sig { display: flex; border-top: 1px solid #bbb; font-size: 11px; text-align: center; }
+.r-sigbox { flex: 1; padding: 6px 10px 8px; border-right: 1px solid #bbb; display: flex; flex-direction: column; align-items: center; }
+.r-sigbox:last-child { border-right: none; }
+.r-sigline { border-bottom: 1px solid #888; width: 70%; margin: 14px auto 3px; }
+.r-siglbl { color: #666; font-size: 10.5px; }
+.r-signame { font-weight: 700; font-size: 11px; margin-top: 1px; }
+.li-builder { border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin:12px 0; background:var(--bg); display:flex; flex-direction:column; gap:14px; }
+.chart-toggle { display:flex; gap:8px; margin-bottom:2px; }
+
+/* ─── Interactive SVG tooth chart ─── */
+.tooth-chart { margin-bottom:4px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 4px; }
+.tooth-svg { width:100%; height:auto; max-width:720px; display:block; margin:0 auto; overflow:visible; }
+.tc-gumband { fill:var(--purple-light); opacity:0.55; }
+.tc-midline { stroke:var(--border2); stroke-width:1; stroke-dasharray:3 5; }
+.tooth-shape { cursor:pointer; }
+.tooth-shape .tooth-root { fill:#F2EFF7; stroke:var(--border2); stroke-width:1; transition:fill 0.12s, stroke 0.12s; }
+.tooth-shape .tooth-crown { fill:#FFFFFF; stroke:var(--border2); stroke-width:1.3; transition:fill 0.12s, stroke 0.12s; }
+.tooth-shape:hover .tooth-crown { stroke:var(--purple); }
+.tooth-shape:hover .tooth-root { stroke:var(--purple); }
+.tooth-shape.sel .tooth-crown { fill:var(--purple); stroke:var(--purple2); }
+.tooth-shape.sel .tooth-root { fill:var(--purple2); stroke:var(--purple2); }
+.tooth-num { font-size:12px; font-weight:600; fill:var(--text2); cursor:pointer; user-select:none; }
+.tooth-num.sel { fill:var(--purple); font-weight:800; }
+
+.surface-picker:empty { display:none; }
+.surf-picker-box { display:flex; gap:22px; align-items:center; flex-wrap:wrap; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px 16px; }
+.surf-picker-head { font-size:12px; font-weight:700; color:var(--text); margin-bottom:2px; }
+.surf-picker-sub { font-size:11px; color:var(--text3); margin-bottom:10px; }
+.surf-target { width:118px; height:118px; flex-shrink:0; }
+.surf-region { fill:var(--bg2); stroke:var(--surface); stroke-width:3; cursor:pointer; transition:fill 0.12s; }
+.surf-region:hover { fill:var(--purple-light); }
+.surf-region.sel { fill:var(--purple); }
+.surf-center { fill:var(--surface); stroke:var(--border2); stroke-width:2; cursor:pointer; transition:fill 0.12s, stroke 0.12s; }
+.surf-center:hover { stroke:var(--purple); }
+.surf-center.sel { fill:var(--purple2); stroke:var(--purple2); }
+.surf-label { font-size:12px; font-weight:700; fill:var(--text2); pointer-events:none; }
+.surf-label-center { font-size:12px; font-weight:800; pointer-events:none; }
+.surf-legend-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.surf-legend-item { border:1px solid var(--border); border-radius:20px; padding:4px 11px; cursor:pointer; font-size:11px; font-weight:500; color:var(--text2); background:var(--bg); transition:all 0.12s; }
+.surf-legend-item:hover { border-color:var(--purple); color:var(--purple); }
+.surf-legend-item.sel { background:var(--purple-light); color:var(--purple); border-color:var(--purple); font-weight:700; }
+
+.li-table { width:100%; border-collapse:collapse; }
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}.full{grid-column:auto;}.content{padding:1rem;}.topbar{padding:0 1rem;}.tab-row{padding:0 1rem;}.branch-grid{grid-template-columns:1fr 1fr;}}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+</style>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+</head>
+<body>
+
+<!-- LOGIN -->
+
+
+<div class="toast" id="toast"></div>
+
+
+
+
+</body>
+</html>
