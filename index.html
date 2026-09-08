@@ -280,664 +280,7 @@ tr:hover td { background: var(--bg); }
 @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}.full{grid-column:auto;}.content{padding:1rem;}.topbar{padding:0 1rem;}.tab-row{padding:0 1rem;}.branch-grid{grid-template-columns:1fr 1fr;}}
 @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 </style>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script>
 
-
-const BRANCHES = {
-  branch1: { key:'branch1', name:'สาขาเทพารักษ์', nameEn:'Thepharak Branch', cls:'b1' },
-  branch2: { key:'branch2', name:'สาขาศรีนครินทร์', nameEn:'Srinakarin Branch', cls:'b2' }
-};
-
-const PROC_GROUPS=[
-  {label:'🦷 ทันตกรรมทั่วไป',cls:'',items:['ขูดหินปูน','อุดฟัน','ถอนฟัน','ผ่าฟันคุด','เกลารากฟัน']},
-  {label:'👑 ทันตกรรมบูรณะ',cls:'',items:['รากเทียม','ครอบฟัน','สะพานฟัน','ฟันปลอมฐานพลาสติก','ฟันปลอมฐานโลหะ','ฟันปลอมทั้งปาก']},
-  {label:'🔧 จัดฟัน',cls:'ortho',items:['ปรับเครื่องมือจัดฟัน','ติดอุปกรณ์หลุด','ติดอุปกรณ์จัดฟันบน','ติดอุปกรณ์จัดฟันล่าง','จองโปรโมชั่นจัดฟัน']},
-  {label:'📷 เอกซเรย์',cls:'xray',items:['ถ่ายเอกซเรย์ฟิล์มเล็ก','ถ่ายเอกซเรย์ฟิล์มใหญ่']}
-];
-const ALL_PROCS=PROC_GROUPS.flatMap(g=>g.items);
-const BC=['bt','bb','bc','bp','ba','bpk','bi','bg'];
-const pcm={}; let ci=0;
-function gpc(p){if(!pcm[p])pcm[p]=BC[ci++%BC.length];return pcm[p];}
-ALL_PROCS.forEach(p=>gpc(p));
-
-// ─── Firebase ───────────────────────────────────────────────────────────────
-// ─── Firebase ───────────────────────────────────────────────────────────────
-const firebaseConfig = {
-  apiKey: "AIzaSyCPJeGGyUe4Lz7zH00t8U2pbNkuhTpP8ik",
-  authDomain: "wtt-dental.firebaseapp.com",
-  databaseURL: "https://wtt-dental-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "wtt-dental",
-  storageBucket: "wtt-dental.firebasestorage.app",
-  messagingSenderId: "474856182089",
-  appId: "1:474856182089:web:68dbeafa16b8c58d848a98"
-};
-let db = null;
-function initFirebase(){if(db)return; // init once only
-  try {
-    if(typeof firebase !== 'undefined'){
-      firebase.initializeApp(firebaseConfig);
-      db = firebase.database();
-      console.log('Firebase ready');
-    } else { console.warn('Firebase not loaded, using localStorage'); }
-  } catch(e){ console.warn('Firebase init error:', e); }
-}
-initFirebase();
-
-// helpers
-function fbSet(path, data){ if(!db) return Promise.resolve(); return db.ref(path).set(data); }
-async function fbGet(path){ if(!db) return null; const snap = await db.ref(path).once('value'); return snap.exists() ? snap.val() : null; }
-
-function sp(){ fbSet('branches/'+currentBranch.key+'/patients', patients); try{localStorage.setItem('wtt_patients_'+currentBranch.key,JSON.stringify(patients));}catch(e){} }
-function sd(){ fbSet('branches/'+currentBranch.key+'/dentists', dentists); try{localStorage.setItem('wtt_dentists_'+currentBranch.key,JSON.stringify(dentists));}catch(e){} }
-function sc(){ fbSet('branches/'+currentBranch.key+'/clinic', clinic); try{localStorage.setItem('wtt_clinic_'+currentBranch.key,JSON.stringify(clinic));}catch(e){} }
-function su(){ fbSet('global/users', users); try{localStorage.setItem('wtt_users',JSON.stringify(users));}catch(e){} }
-
-const DEFAULT_USERS = [
-  {id:1,username:'admin',password:'admin1234',name:'ผู้ดูแลระบบ',role:'admin'},
-  {id:2,username:'staff',password:'staff1234',name:'เจ้าหน้าที่',role:'staff'}
-];
-
-// ─── Migration: เดิม branches/{bkey}/records (flat) → branches/{bkey}/patients (nested) ──
-// ทำครั้งเดียวต่อสาขา, ไม่แตะ/ลบข้อมูลเดิม, มี guard กันรันซ้ำ
-async function migrateOldRecordsIfNeeded(bkey){
-  if(!db) return;
-  try{
-    const done = await fbGet('branches/'+bkey+'/migrationDone');
-    if(done===true) return;
-    const oldRecs = await fbGet('branches/'+bkey+'/records');
-    if(!oldRecs){ await fbSet('branches/'+bkey+'/migrationDone', true); return; }
-    const flat = Object.values(oldRecs);
-    const groups={};
-    flat.forEach(r=>{
-      const key = (r.dn&&r.dn.trim()) ? 'dn:'+r.dn.trim() : 'nk:'+(r.name||'').trim().toLowerCase()+'|'+(r.pid||'')+'|'+(r.tel||'');
-      (groups[key]=groups[key]||[]).push(r);
-    });
-    const newPatients={};
-    Object.values(groups).forEach(recs=>{
-      recs.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-      const first=recs[0];
-      const patientId='mig_'+(first.dn?first.dn:first.id);
-      const visits={};
-      recs.forEach(r=>{
-        const visitId='mig_v_'+r.id;
-        const price=r.price||0, discount=r.discount||0;
-        visits[visitId]={
-          id:visitId, rNo:r.rNo, date:r.date, dentistId:r.dentistId, dentition:'adult',
-          items:[{procedure:(r.procedures||[]).join(', ')||'รวมยอดเดิม', tooth:'', surfaces:[], price}],
-          discount, subtotal:price, total:price-discount,
-          payment:r.payment||'cash', note:r.note||'', by:r.by||''
-        };
-      });
-      newPatients[patientId]={
-        id:patientId, dn:first.dn||'', name:first.name, pid:first.pid||'',
-        birthdate:'', age:first.age||'', tel:first.tel||'',
-        createdAt:Date.now(), createdBy:'migration', visits
-      };
-    });
-    const existing = (await fbGet('branches/'+bkey+'/patients')) || {};
-    const merged = {...newPatients, ...existing};
-    await fbSet('branches/'+bkey+'/patients', merged);
-    await fbSet('branches/'+bkey+'/migrationDone', true);
-  }catch(e){ console.warn('Migration failed:', e); }
-}
-
-async function loadBranchData(bkey) {
-  showLoading(true);
-  let p={}, d=[], c={}, u=[];
-  // โหลด localStorage ก่อนเสมอ (fallback ทันที)
-  try{p=JSON.parse(localStorage.getItem('wtt_patients_'+bkey)||'{}');}catch(e){}
-  try{d=JSON.parse(localStorage.getItem('wtt_dentists_'+bkey)||'[]');}catch(e){}
-  try{c=JSON.parse(localStorage.getItem('wtt_clinic_'+bkey)||'{}');}catch(e){}
-  try{u=JSON.parse(localStorage.getItem('wtt_users')||'[]');}catch(e){}
-  if(!u.length){ u=[...DEFAULT_USERS]; try{localStorage.setItem('wtt_users',JSON.stringify(u));}catch(e){} }
-  // ลอง Firebase เพิ่มเติม (ถ้าออนไลน์)
-  try {
-    await migrateOldRecordsIfNeeded(bkey);
-    const snap = await Promise.race([
-      db.ref('branches/'+bkey).once('value'),
-      new Promise((_,rej)=>setTimeout(()=>rej('timeout'),3000))
-    ]);
-    const gsnap = await db.ref('global/users').once('value');
-    if(snap.exists()){
-      const v = snap.val();
-      if(v.patients) p = v.patients;
-      if(v.dentists) d = Object.values(v.dentists);
-      if(v.clinic) c = v.clinic;
-    }
-    if(gsnap.exists()){ u = Object.values(gsnap.val()); }
-  } catch(e) { /* ใช้ข้อมูล localStorage ที่โหลดไปแล้ว */ }
-  showLoading(false);
-  return {patients:p, dentists:d, clinic:c, users:u};
-}
-
-// Real-time listener
-let fbListeners = [];
-function startRealtimeSync(bkey){
-  try{ if(!db){console.log("No DB, skip sync");return;} }catch(e){return;}
-  stopRealtimeSync();
-  const h1 = db.ref('branches/'+bkey+'/patients').on('value', snap=>{
-    if(!currentBranch)return;
-    const newPatients = snap.exists() ? snap.val() : {};
-    if(JSON.stringify(newPatients)!==JSON.stringify(patients)){
-      patients = newPatients;
-      renderTable(); updateStats(); renderReceiptList();
-      if(document.getElementById('dash-start').value) renderDashboard();
-    }
-  });
-  const h2 = db.ref('branches/'+bkey+'/dentists').on('value', snap=>{
-    if(!currentBranch)return;
-    dentists = snap.exists() ? Object.values(snap.val()) : [];
-    rdl(); rds();
-  });
-  const h3 = db.ref('global/users').on('value', snap=>{
-    if(!currentBranch)return;
-    users = snap.exists() ? Object.values(snap.val()) : [];
-    renderUserList();
-  });
-  fbListeners = [
-    {r: db.ref('branches/'+bkey+'/patients'), h: h1},
-    {r: db.ref('branches/'+bkey+'/dentists'), h: h2},
-    {r: db.ref('global/users'), h: h3}
-  ];
-}
-function stopRealtimeSync(){
-  fbListeners.forEach(({r,h})=>r.off('value',h));
-  fbListeners=[];
-}
-
-function showLoading(show){
-  let el=document.getElementById('fb-loading');
-  if(!el && !show) return;
-  if(!el){
-    el=document.createElement('div');
-    el.id='fb-loading';
-    el.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-size:15px;color:#5B3A8A;gap:10px;';
-    el.innerHTML='<i class="ti ti-cloud-download" style="font-size:32px;animation:spin 1s linear infinite;"></i><div>กำลังโหลดข้อมูล...</div>';
-    document.body.appendChild(el);
-  }
-  el.style.display=show?'flex':'none';
-}
-
-// ─── /Firebase ──────────────────────────────────────────────────────────────
-
-let currentUser=null, currentBranch=null, selBranch=null;
-let patients={},dentists=[],clinic={},users=[];
-let selProcs=[],rCnt=1,currentReceiptId=null;
-let currentVisitItems=[], chartMode='adult', selectedTooth=null, selectedSurfaces=[];
-const today=new Date().toISOString().split('T')[0];
-
-const ADULT_QUADS = {
-  ur:[18,17,16,15,14,13,12,11],
-  ul:[21,22,23,24,25,26,27,28],
-  lr:[48,47,46,45,44,43,42,41],
-  ll:[31,32,33,34,35,36,37,38]
-};
-const CHILD_QUADS = {
-  ur:[55,54,53,52,51],
-  ul:[61,62,63,64,65],
-  lr:[85,84,83,82,81],
-  ll:[71,72,73,74,75]
-};
-// ฟันหน้า (Anterior: incisor/canine, FDI last digit 1-3): Mesial, Distal, Labial, Palatal/Lingual, Incisal
-const SURF_ANTERIOR=[{code:'M',label:'Mesial'},{code:'D',label:'Distal'},{code:'L',label:'Labial'},{code:'P',label:'Palatal/Lingual'},{code:'I',label:'Incisal'}];
-// ฟันหลัง (Posterior: premolar/molar, FDI last digit 4-8): Mesial, Distal, Buccal, Lingual, Occlusal
-const SURF_POSTERIOR=[{code:'M',label:'Mesial'},{code:'D',label:'Distal'},{code:'B',label:'Buccal'},{code:'L',label:'Lingual'},{code:'O',label:'Occlusal'}];
-
-function toothLastDigit(fdi){ return Number(String(fdi).slice(-1)); }
-function isAnteriorTooth(fdi){ return toothLastDigit(fdi)<=3; }
-function toothTypeOf(fdi){
-  const last=toothLastDigit(fdi);
-  if(last<=2) return 'incisor';
-  if(last===3) return 'canine';
-  if(last===4) return 'premolar';
-  return 'molar';
-}
-
-// ─── เรขาคณิตของผังฟันรูปโค้ง (arch geometry) ───────────────────────────────
-const ARCH = { cx:380, cyMid:230, rx:300, ryU:170, ryL:170, thetaStart:170, thetaEnd:10 };
-
-function archPoint(idx, count, upper){
-  const t = count===1 ? 0.5 : idx/(count-1);
-  const thetaDeg = ARCH.thetaStart - t*(ARCH.thetaStart-ARCH.thetaEnd);
-  const theta = thetaDeg*Math.PI/180;
-  const x = ARCH.cx + ARCH.rx*Math.cos(theta);
-  const y = upper ? (ARCH.cyMid - ARCH.ryU*Math.sin(theta)) : (ARCH.cyMid + ARCH.ryL*Math.sin(theta));
-  return {x, y, cx:ARCH.cx, cy:ARCH.cyMid};
-}
-function rotForPoint(p){
-  const dx=p.x-p.cx, dy=p.y-p.cy;
-  const len=Math.hypot(dx,dy)||1;
-  const ux=dx/len, uy=dy/len;
-  return Math.atan2(-ux, uy)*180/Math.PI;
-}
-function archPoints(upper, pad){
-  const N=40; const pts=[];
-  for(let i=0;i<=N;i++){
-    const t=i/N;
-    const thetaDeg=ARCH.thetaStart - t*(ARCH.thetaStart-ARCH.thetaEnd);
-    const theta=thetaDeg*Math.PI/180;
-    const x=ARCH.cx+(ARCH.rx+pad)*Math.cos(theta);
-    const y=upper ? (ARCH.cyMid-(ARCH.ryU+pad)*Math.sin(theta)) : (ARCH.cyMid+(ARCH.ryL+pad)*Math.sin(theta));
-    pts.push([x,y]);
-  }
-  return pts;
-}
-function pathFromPoints(pts){
-  return pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-}
-function gumBandD(upper){
-  const outer=archPoints(upper,40);
-  const inner=archPoints(upper,-22).reverse();
-  return pathFromPoints(outer)+' '+pathFromPoints(inner).replace(/^M/,'L')+' Z';
-}
-
-// รูปทรงฟันแต่ละประเภท (local coords, origin ~กึ่งกลางฟัน, แกน y ลง = รากฟัน)
-function toothShapeMarkup(type){
-  switch(type){
-    case 'incisor':
-      return { crown:'M -6,-15 Q -6,-17 -3,-17 L 3,-17 Q 6,-17 6,-15 L 6,-2 Q 6,1.5 0,1.5 Q -6,1.5 -6,-2 Z',
-                root:'M -3.2,-1 Q -4.2,10 -1.5,15.5 Q 0,17.5 1.5,15.5 Q 4.2,10 3.2,-1 Z' };
-    case 'canine':
-      return { crown:'M -6,-2 Q -6.5,-9.5 -1,-17.5 Q 0,-19.5 1,-17.5 Q 6.5,-9.5 6,-2 Q 0,2.2 -6,-2 Z',
-                root:'M -3.2,-2 Q -4.4,10 -1.5,16.5 Q 0,18.5 1.5,16.5 Q 4.4,10 3.2,-2 Z' };
-    case 'premolar':
-      return { crown:'M -7.5,-3 Q -8,-13 -3.5,-15 Q -1.5,-16.5 0,-14.5 Q 1.5,-16.5 3.5,-15 Q 8,-13 7.5,-3 Q 0,2.2 -7.5,-3 Z',
-                root:'M -4,-2 Q -5.6,9 -3,15 Q -1.2,18 0,15.5 Q 1.2,18 3,15 Q 5.6,9 4,-2 Z' };
-    case 'molar':
-    default:
-      return { crown:'M -10,-4 Q -10.5,-14 -6,-16 Q -3,-17.5 0,-15.5 Q 3,-17.5 6,-16 Q 10.5,-14 10,-4 Q 0,3 -10,-4 Z',
-                root:'M -6,-3 Q -8,9 -4,15.5 Q -2,18.5 0,15 Q 2,18.5 4,15.5 Q 8,9 6,-3 Z' };
-  }
-}
-function fdiListsForMode(mode){
-  const q = mode==='adult' ? ADULT_QUADS : CHILD_QUADS;
-  return { upper:[...q.ur, ...q.ul], lower:[...q.lr, ...q.ll] };
-}
-
-function selectBranch(bkey) {
-  selBranch = bkey;
-  document.querySelectorAll('.branch-btn').forEach(b => b.classList.remove('selected'));
-  document.querySelector('.branch-btn[data-branch="'+bkey+'"]').classList.add('selected');
-}
-
-async function doLogin(){
-  // เช็ค DEFAULT_USERS ก่อนเสมอ
-  if(!selBranch){toast('กรุณาเลือกสาขาก่อน');return;}
-  const u=document.getElementById('login-user').value.trim();
-  const p=document.getElementById('login-pass').value;
-  // ตรวจสอบ default users ก่อนเลย (ไม่ต้องรอ Firebase)
-  let checkUsers = [...DEFAULT_USERS];
-  try{const lu=JSON.parse(localStorage.getItem('wtt_users')||'[]');if(lu.length)checkUsers=lu;}catch(e){}
-  let found = checkUsers.find(x=>x.username===u&&x.password===p);
-  if(!found){toast('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');return;}
-  // login สำเร็จ — โหลดข้อมูลสาขา
-  const data=await loadBranchData(selBranch);
-  // อัปเดต found จาก Firebase ถ้าโหลดได้
-  if(data.users && data.users.length){
-    const fbFound=data.users.find(x=>x.username===u&&x.password===p);
-    if(fbFound) found=fbFound;
-  }
-  document.getElementById('login-err').classList.remove('show');
-  currentUser=found; currentBranch=BRANCHES[selBranch];
-  patients=data.patients; dentists=data.dentists; clinic=data.clinic; users=data.users;
-  // นับ receipt counter
-  const allVisits=flattenVisits();
-  if(allVisits.length){const nums=allVisits.map(r=>parseInt(r.rNo)).filter(n=>!isNaN(n));rCnt=nums.length?Math.max(...nums)+1:1;}
-
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('app-screen').classList.remove('hidden');
-  document.getElementById('topbar-user').textContent=found.name||found.username;
-  const rb=document.getElementById('topbar-role');rb.textContent=found.role==='admin'?'Admin':'Staff';rb.className='role-tag '+(found.role==='admin'?'role-admin':'role-staff');
-  document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden',found.role!=='admin'));
-
-  // อัปเดต branch UI
-  const tbi=document.getElementById('tb-icon');
-  tbi.className='topbar-icon '+currentBranch.cls;
-  const tbb=document.getElementById('tb-branch-badge');
-  tbb.textContent=currentBranch.name; tbb.className='branch-badge '+currentBranch.cls;
-  document.getElementById('branch-indicator').textContent=currentBranch.name;
-  document.getElementById('branch-indicator').className='branch-badge '+currentBranch.cls;
-  // active tab color
-  document.querySelectorAll('.tab-btn.active').forEach(b=>{ b.classList.remove('b1-active','b2-active'); b.classList.add(currentBranch.cls+'-active'); });
-
-  document.getElementById('f-date').value=today;
-  rds();rdl();renderTable();updateStats();loadSettings();setChartMode('adult');
-  startRealtimeSync(selBranch);
-}
-function doSignOut(){stopRealtimeSync();currentUser=null;currentBranch=null;selBranch=null;document.getElementById('app-screen').classList.add('hidden');document.getElementById('login-screen').classList.remove('hidden');document.getElementById('login-user').value='';document.getElementById('login-pass').value='';document.querySelectorAll('.branch-btn').forEach(b=>b.classList.remove('selected'));switchTab('record');}
-
-function loadSettings(){
-  document.getElementById('settings-branch-name').textContent=currentBranch?currentBranch.name:'';
-  if(clinic.addr)document.getElementById('s-addr').value=clinic.addr;else document.getElementById('s-addr').value='';
-  if(clinic.tel)document.getElementById('s-tel').value=clinic.tel;else document.getElementById('s-tel').value='';
-  if(clinic.bookNo)document.getElementById('s-bookno').value=clinic.bookNo;else document.getElementById('s-bookno').value='';
-}
-function saveSettings(){clinic.addr=document.getElementById('s-addr').value.trim();clinic.tel=document.getElementById('s-tel').value.trim();clinic.bookNo=document.getElementById('s-bookno').value.trim()||'0009';sc();toast('บันทึกเรียบร้อย');}
-
-// สร้างปุ่มหัตถการ (เลือกได้ทีละ 1 รายการ สำหรับสร้างรายการหัตถการที่กำลังเพิ่ม)
-const qp=document.getElementById('proc-quick');
-PROC_GROUPS.forEach(g=>{const gd=document.createElement('div');const lb=document.createElement('div');lb.className='proc-group-lbl';lb.textContent=g.label;gd.appendChild(lb);const bd=document.createElement('div');bd.className='proc-group-btns';g.items.forEach(p=>{const b=document.createElement('button');b.type='button';b.className='pq-btn'+(g.cls?' '+g.cls:'');b.textContent=p;b.onclick=()=>{
-  const already=selProcs[0]===p;
-  document.querySelectorAll('#proc-quick .pq-btn.sel').forEach(x=>x.classList.remove('sel'));
-  if(already){selProcs=[];}else{selProcs=[p];b.classList.add('sel');}
-};bd.appendChild(b);});gd.appendChild(bd);qp.appendChild(gd);});
-
-// ─── ผังฟัน (Interactive SVG Dental Chart, FDI notation) ───────────────────
-function setChartMode(mode){
-  chartMode=mode; selectedTooth=null; selectedSurfaces=[];
-  document.getElementById('btn-mode-adult').classList.toggle('sel',mode==='adult');
-  document.getElementById('btn-mode-child').classList.toggle('sel',mode==='child');
-  renderToothChart(); renderSurfacePicker();
-}
-function toothGroupMarkup(fdi, p, rot){
-  const sel = selectedTooth===String(fdi);
-  const shp = toothShapeMarkup(toothTypeOf(fdi));
-  const dx=p.x-p.cx, dy=p.y-p.cy; const len=Math.hypot(dx,dy)||1;
-  const ux=dx/len, uy=dy/len;
-  const lx=p.x+ux*26, ly=p.y+uy*26;
-  return `<g class="tooth-shape${sel?' sel':''}" onclick="selectTooth('${fdi}')" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)}) rotate(${rot.toFixed(1)})">
-      <path class="tooth-root" d="${shp.root}"></path>
-      <path class="tooth-crown" d="${shp.crown}"></path>
-    </g>
-    <text class="tooth-num${sel?' sel':''}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" onclick="selectTooth('${fdi}')">${fdi}</text>`;
-}
-function renderToothChart(){
-  const {upper, lower} = fdiListsForMode(chartMode);
-  const upperMk = upper.map((fdi,i)=>toothGroupMarkup(fdi, archPoint(i,upper.length,true), rotForPoint(archPoint(i,upper.length,true)))).join('');
-  const lowerMk = lower.map((fdi,i)=>toothGroupMarkup(fdi, archPoint(i,lower.length,false), rotForPoint(archPoint(i,lower.length,false)))).join('');
-  document.getElementById('tooth-chart').innerHTML = `
-    <svg viewBox="0 0 760 460" class="tooth-svg" xmlns="http://www.w3.org/2000/svg">
-      <path class="tc-gumband" d="${gumBandD(true)}"></path>
-      <path class="tc-gumband" d="${gumBandD(false)}"></path>
-      <line x1="60" y1="230" x2="700" y2="230" class="tc-midline"></line>
-      ${upperMk}
-      ${lowerMk}
-    </svg>`;
-}
-function selectTooth(fdi){
-  selectedTooth = (selectedTooth===String(fdi)) ? null : String(fdi);
-  selectedSurfaces=[];
-  renderToothChart(); renderSurfacePicker();
-}
-function renderSurfacePicker(){
-  const el=document.getElementById('surface-picker');
-  if(!selectedTooth){el.innerHTML='';return;}
-  const fdi=selectedTooth;
-  const anterior=isAnteriorTooth(fdi);
-  const set=anterior?SURF_ANTERIOR:SURF_POSTERIOR;
-  const byCode=c=>set.find(s=>s.code===c);
-  const top=byCode(anterior?'L':'B'), bottom=byCode(anterior?'P':'L'), left=byCode('M'), right=byCode('D'), center=byCode(anterior?'I':'O');
-  const isSel=c=>selectedSurfaces.includes(c);
-  const centerSel=isSel(center.code);
-  const svg=`<svg viewBox="0 0 120 120" class="surf-target" xmlns="http://www.w3.org/2000/svg">
-      <polygon class="surf-region${isSel(top.code)?' sel':''}" points="10,10 110,10 60,60" onclick="toggleSurface('${top.code}')"></polygon>
-      <polygon class="surf-region${isSel(right.code)?' sel':''}" points="110,10 110,110 60,60" onclick="toggleSurface('${right.code}')"></polygon>
-      <polygon class="surf-region${isSel(bottom.code)?' sel':''}" points="110,110 10,110 60,60" onclick="toggleSurface('${bottom.code}')"></polygon>
-      <polygon class="surf-region${isSel(left.code)?' sel':''}" points="10,110 10,10 60,60" onclick="toggleSurface('${left.code}')"></polygon>
-      <circle class="surf-center${centerSel?' sel':''}" cx="60" cy="60" r="21" onclick="toggleSurface('${center.code}')"></circle>
-      <text class="surf-label" x="60" y="5" text-anchor="middle" dominant-baseline="hanging">${top.code}</text>
-      <text class="surf-label" x="115" y="60" text-anchor="end" dominant-baseline="middle">${right.code}</text>
-      <text class="surf-label" x="60" y="115" text-anchor="middle" dominant-baseline="auto">${bottom.code}</text>
-      <text class="surf-label" x="5" y="60" text-anchor="start" dominant-baseline="middle">${left.code}</text>
-      <text class="surf-label-center" x="60" y="61" text-anchor="middle" dominant-baseline="middle" style="fill:${centerSel?'#fff':'var(--text)'};pointer-events:none;">${center.code}</text>
-    </svg>`;
-  const legend=set.map(s=>`<span class="surf-legend-item${isSel(s.code)?' sel':''}" onclick="toggleSurface('${s.code}')">${s.code} · ${s.label}</span>`).join('');
-  el.innerHTML=`<div class="surf-picker-box">
-      <div class="surf-target-wrap">${svg}</div>
-      <div>
-        <div class="surf-picker-head">ซี่ฟัน ${fdi} · ${anterior?'ฟันหน้า':'ฟันหลัง'} (คลิกส่วนของฟันเพื่อเลือกด้าน)</div>
-        <div class="surf-picker-sub">เลือกได้มากกว่า 1 ด้าน</div>
-        <div class="surf-legend-list">${legend}</div>
-      </div>
-    </div>`;
-}
-function toggleSurface(code){
-  if(selectedSurfaces.includes(code)) selectedSurfaces=selectedSurfaces.filter(c=>c!==code);
-  else selectedSurfaces.push(code);
-  renderSurfacePicker();
-}
-
-// ─── รายการหัตถการใน visit ที่กำลังสร้าง ────────────────────────────────────
-function addLineItem(){
-  if(!selProcs.length){toast('กรุณาเลือกหัตถการ');return;}
-  const price=parseFloat(document.getElementById('li-price').value)||0;
-  currentVisitItems.push({procedure:selProcs[0],tooth:selectedTooth||'',surfaces:[...selectedSurfaces],price});
-  selProcs=[]; selectedTooth=null; selectedSurfaces=[];
-  document.querySelectorAll('#proc-quick .pq-btn.sel').forEach(b=>b.classList.remove('sel'));
-  document.getElementById('li-price').value='';
-  renderToothChart(); renderSurfacePicker(); renderLineItems();
-}
-function removeLineItem(idx){currentVisitItems.splice(idx,1);renderLineItems();}
-function renderLineItems(){
-  const body=document.getElementById('line-items-body');
-  document.getElementById('li-empty').style.display=currentVisitItems.length?'none':'block';
-  body.innerHTML=currentVisitItems.map((it,i)=>`<tr><td style="font-size:12px;">${it.procedure}</td><td style="text-align:center;font-size:12px;">${it.tooth||'-'}</td><td style="font-size:11px;">${(it.surfaces||[]).join(', ')||'-'}</td><td class="price-green">${fp(it.price)}</td><td><button class="btn-del" onclick="removeLineItem(${i})"><i class="ti ti-trash"></i></button></td></tr>`).join('');
-  updateVisitTotals();
-}
-function updateVisitTotals(){
-  const subtotal=currentVisitItems.reduce((s,it)=>s+(it.price||0),0);
-  const disc=parseFloat(document.getElementById('f-discount').value)||0;
-  document.getElementById('visit-net').textContent=fp(subtotal-disc);
-}
-
-function rds(){const sel=document.getElementById('f-dentist');const cur=sel.value;sel.innerHTML='<option value="">-- เลือกทันตแพทย์ --</option>';dentists.forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent='ทพ. '+d.fname+' '+d.lname+(d.spec?' ('+d.spec+')':'');sel.appendChild(o);});if(cur)sel.value=cur;}
-function rdl(){const el=document.getElementById('dentist-list');if(!dentists.length){el.innerHTML='<div class="empty"><i class="ti ti-user-off"></i>ยังไม่มีทันตแพทย์</div>';return;}el.innerHTML=dentists.map(d=>`<div class="dentist-row"><div class="row-inner"><div class="dentist-avatar">${d.fname[0]}${d.lname[0]}</div><div><div style="font-size:13px;font-weight:600;">ทพ. ${d.fname} ${d.lname}</div><div style="font-size:11px;color:var(--text2);">${d.license?'ใบอนุญาต: '+d.license:''}${d.license&&d.spec?' · ':''}${d.spec||''}</div></div></div><button class="btn-del" onclick="delD(${d.id})"><i class="ti ti-trash"></i></button></div>`).join('');}
-function addDentist(){const fn=document.getElementById('d-fname').value.trim(),ln=document.getElementById('d-lname').value.trim();if(!fn||!ln){toast('กรุณากรอกชื่อและนามสกุล');return;}dentists.push({id:Date.now(),fname:fn,lname:ln,license:document.getElementById('d-license').value.trim(),spec:document.getElementById('d-spec').value.trim()});sd();rdl();rds();['d-fname','d-lname','d-license','d-spec'].forEach(id=>document.getElementById(id).value='');toast('เพิ่มทันตแพทย์เรียบร้อย');}
-function delD(id){dentists=dentists.filter(d=>d.id!==id);sd();rdl();rds();}
-function gdn(id){const d=dentists.find(x=>x.id==id);return d?'ทพ. '+d.fname+' '+d.lname:'-';}
-
-function switchTab(tab){const tabs=['record','receipt','dentists','admin','dashboard','settings'];tabs.forEach(t=>{const b=document.getElementById('tab-'+t);if(b){b.classList.remove('active','b1-active','b2-active');}});const active=document.getElementById('tab-'+tab);if(active){active.classList.add('active');if(currentBranch)active.classList.add(currentBranch.cls+'-active');}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-'+tab).classList.add('active');if(tab==='receipt')renderReceiptList();if(tab==='admin')renderUserList();if(tab==='settings')loadSettings();if(tab==='dashboard'){if(!document.getElementById('dash-start').value){setDashRange('today');}else{renderDashboard();}}}
-
-function baht(n){if(!n||n===0)return'ศูนย์บาทถ้วน';const dg=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'],ps=['','สิบ','ร้อย','พัน','หมื่น','แสน','ล้าน'];function rg(x){let s='',sn=String(parseInt(x));for(let i=0;i<sn.length;i++){let d=parseInt(sn[i]),p=sn.length-1-i;if(d===0)continue;if(p===1&&d===2)s+='ยี่';else if(p===1&&d===1)s+='';else s+=dg[d];s+=ps[p];}return s;}let ip=Math.floor(n),dp=Math.round((n-ip)*100),r='';if(ip>=1000000){r+=rg(Math.floor(ip/1000000))+'ล้าน';ip=ip%1000000;}if(ip>0)r+=rg(ip);r+='บาท';return r+(dp>0?rg(dp)+'สตางค์':'ถ้วน');}
-function fdt(d){if(!d)return'-';const ms=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];const[y,m,day]=d.split('-');return`${parseInt(day)} ${ms[parseInt(m)-1]} ${parseInt(y)+543}`;}
-function fd(d){if(!d)return'-';const[y,m,day]=d.split('-');return`${day}/${m}/${y.slice(2)}`;}
-function fmtMonthTH(ym){ const ms=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']; const[y,m]=ym.split('-'); return (ms[parseInt(m,10)-1]||m)+' '+(parseInt(y,10)+543); }
-const ORTHO_PROMO_PROC='จองโปรโมชั่นจัดฟัน';
-function fp(p){if(p===null||p===undefined||p==='')return'-';return'฿'+Number(p).toLocaleString('th-TH');}
-function fn(p){if(!p&&p!==0)return'-';return Number(p).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
-
-// ─── ข้อมูลคนไข้/visit แบบ nested ────────────────────────────────────────────
-function flattenVisits(){
-  const out=[];
-  Object.values(patients).forEach(p=>{
-    Object.values(p.visits||{}).forEach(v=>{
-      out.push({
-        id:v.id, rNo:v.rNo, date:v.date, dn:p.dn, name:p.name, pid:p.pid,
-        age:p.age, birthdate:p.birthdate, tel:p.tel, dentistId:v.dentistId,
-        procedures:(v.items||[]).map(it=>it.procedure),
-        price:v.total, discount:v.discount, payment:v.payment, note:v.note, by:v.by,
-        items:v.items, patientId:p.id, visitId:v.id
-      });
-    });
-  });
-  return out.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||String(b.id).localeCompare(String(a.id)));
-}
-function findOrCreatePatient(dn,name,pid,tel){
-  let p = dn ? Object.values(patients).find(x=>x.dn===dn)
-             : Object.values(patients).find(x=>x.name.trim().toLowerCase()===name.trim().toLowerCase()&&x.pid===pid&&x.tel===tel);
-  const birthdate=document.getElementById('f-birthdate').value;
-  const age=document.getElementById('f-age').value;
-  if(!p){
-    const id='p_'+Date.now();
-    p={id,dn,name,pid,birthdate:birthdate||'',age,tel,createdAt:Date.now(),createdBy:currentUser?currentUser.username:'',visits:{}};
-    patients[id]=p;
-  } else {
-    p.name=name; if(pid)p.pid=pid; if(tel)p.tel=tel;
-    if(birthdate)p.birthdate=birthdate;
-    if(age)p.age=age;
-  }
-  return p;
-}
-function findVisitById(visitId){
-  for(const p of Object.values(patients)){
-    if(p.visits&&p.visits[visitId]) return {patient:p, visit:p.visits[visitId]};
-  }
-  return null;
-}
-
-function addVisit(){const name=document.getElementById('f-name').value.trim();if(!name){toast('กรุณากรอกชื่อคนไข้');return;}if(!document.getElementById('f-dentist').value){toast('กรุณาเลือกทันตแพทย์');return;}if(!currentVisitItems.length){toast('กรุณาเพิ่มรายการหัตถการอย่างน้อย 1 รายการ');return;}
-  const subtotal=currentVisitItems.reduce((s,it)=>s+(it.price||0),0);
-  const discount=parseFloat(document.getElementById('f-discount').value)||0;
-  const dn=document.getElementById('f-dn').value.trim();
-  const pid=document.getElementById('f-pid').value.trim();
-  const tel=document.getElementById('f-tel').value.trim();
-  const patient=findOrCreatePatient(dn,name,pid,tel);
-  const rnoInput=document.getElementById('f-receiptno').value.trim();
-  const rNoVal=rnoInput!==''?rnoInput:rCnt++;
-  const visitId='v_'+Date.now();
-  patient.visits[visitId]={
-    id:visitId, rNo:rNoVal, date:document.getElementById('f-date').value||today,
-    dentistId:parseInt(document.getElementById('f-dentist').value),
-    dentition:chartMode,
-    items:currentVisitItems.map(it=>({...it})),
-    discount, subtotal, total:subtotal-discount,
-    payment:document.getElementById('f-payment').value,
-    note:document.getElementById('f-note').value.trim(),
-    by:currentUser?currentUser.username:''
-  };
-  sp();renderTable();updateStats();clearForm();toast('บันทึกเรียบร้อย');}
-function clearForm(){['f-dn','f-receiptno','f-name','f-pid','f-age','f-birthdate','f-tel','li-price','f-discount','f-note'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-date').value=today;document.getElementById('f-dentist').value='';document.getElementById('f-payment').value='cash';selProcs=[];currentVisitItems=[];document.querySelectorAll('.pq-btn').forEach(b=>b.classList.remove('sel'));setChartMode('adult');renderLineItems();}
-function deleteVisit(visitId){if(currentUser&&currentUser.role!=='admin'){toast('เฉพาะ Admin เท่านั้นที่ลบได้');return;}const found=findVisitById(visitId);if(!found)return;delete found.patient.visits[visitId];if(!Object.keys(found.patient.visits).length)delete patients[found.patient.id];sp();renderTable();updateStats();toast('ลบแล้ว');}
-
-function renderTable(){const q=document.getElementById('search-input').value.toLowerCase();const f=flattenVisits().filter(r=>r.name.toLowerCase().includes(q)||(r.dn&&r.dn.toLowerCase().includes(q)));const isAdmin=currentUser&&currentUser.role==='admin';document.getElementById('empty-state').style.display=f.length?'none':'block';document.getElementById('table-body').innerHTML=f.map(r=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(r.date)}</td><td style="color:var(--text2);font-size:11px;">${r.dn||'-'}</td><td style="font-weight:600;font-size:12px;">${r.name}</td><td style="color:var(--text2);font-size:11px;">${r.age?r.age+'ปี':'-'}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(r.dentistId)}</span></td><td><div class="chips">${r.procedures.map(p=>`<span class="badge ${gpc(p)}">${p}</span>`).join('')}</div></td><td class="price-green">${fp(r.price)}</td><td style="white-space:nowrap;"><button class="btn-sm-teal" onclick="openReceipt('${r.id}')"><i class="ti ti-receipt" style="font-size:12px;"></i>ใบเสร็จ</button>${isAdmin?`<button class="btn-del" onclick="deleteVisit('${r.id}')" style="margin-left:2px;"><i class="ti ti-trash"></i></button>`:''}</td></tr>`).join('');}
-function renderReceiptList(){const q=document.getElementById('receipt-search').value.toLowerCase();const f=flattenVisits().filter(r=>r.name.toLowerCase().includes(q)||(r.dn&&r.dn.toLowerCase().includes(q)));document.getElementById('receipt-empty').style.display=f.length?'none':'block';document.getElementById('receipt-table-body').innerHTML=f.map(r=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(r.date)}</td><td style="color:var(--text2);font-size:11px;">${r.dn||'-'}</td><td style="font-weight:600;font-size:12px;">${r.name}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(r.dentistId)}</span></td><td><div class="chips">${r.procedures.map(p=>`<span class="badge ${gpc(p)}">${p}</span>`).join('')}</div></td><td class="price-green">${fp(r.price)}</td><td><button class="btn-sm-teal" onclick="openReceipt('${r.id}')"><i class="ti ti-receipt" style="font-size:12px;"></i>ออกใบเสร็จ</button></td></tr>`).join('');}
-
-function openReceipt(id){const r=flattenVisits().find(x=>x.id===id);if(!r)return;currentReceiptId=id;document.getElementById('btn-edit-rno').classList.toggle('hidden',!(currentUser&&currentUser.role==='admin'));document.getElementById('r-branch-line').textContent=currentBranch?currentBranch.name+' ('+currentBranch.nameEn+')'+(clinic.tel?' โทร. '+clinic.tel:''):'';document.getElementById('r-book').textContent=clinic.bookNo||'0009';document.getElementById('r-no').textContent=String(r.rNo!==undefined&&r.rNo!==null?r.rNo:r.id).padStart(4,'0');document.getElementById('r-name').textContent=r.name;document.getElementById('r-dn').textContent=r.dn||'-';document.getElementById('r-pid').textContent=r.pid||'-';document.getElementById('r-age').textContent=r.age?r.age+' ปี':'-';document.getElementById('r-date').textContent=fdt(r.date);document.getElementById('r-dentist').textContent=gdn(r.dentistId);document.getElementById('r-cashier').textContent=currentUser?currentUser.name:'';document.getElementById('r-payer').textContent=r.name;
-  const items=r.items||[];const disc=r.discount||0;const subtotal=items.reduce((s,it)=>s+(it.price||0),0);
-  let rows='';
-  items.forEach((it,i)=>{
-    const toothLabel=it.tooth?(' — ซี่ '+it.tooth+((it.surfaces&&it.surfaces.length)?' ('+it.surfaces.join(',')+')':'')):'';
-    rows+=`<tr><td class="tno">${i+1}</td><td>${it.procedure}${toothLabel}${r.note&&i===0?' ('+r.note+')':''}</td><td class="tqty">1</td><td class="tprice">${fn(it.price)}</td><td class="tdisc">-</td><td class="ttotal">${fn(it.price)}</td></tr>`;
-  });
-  for(let i=items.length;i<8;i++)rows+=`<tr class="erow"><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
-  document.getElementById('r-items').innerHTML=rows;
-  const net=subtotal-disc;
-  document.getElementById('r-sub').textContent=subtotal?fn(subtotal)+' บาท':'-';
-  document.getElementById('r-disc').textContent=disc?fn(disc)+' บาท':'- บาท';
-  document.getElementById('r-total').textContent=fn(net)+' บาท';
-  document.getElementById('r-baht-text').textContent=baht(net);
-  const pm=r.payment||'cash';['c-cash','c-transfer','c-card','c-sso'].forEach(id=>document.getElementById(id).classList.remove('checked'));document.getElementById('c-'+pm).classList.add('checked');document.getElementById('pay-cash-a').textContent=pm==='cash'&&subtotal?fn(net):'';document.getElementById('pay-transfer-a').textContent=pm==='transfer'&&subtotal?fn(net):'';document.getElementById('pay-card-a').textContent=pm==='card'&&subtotal?fn(net):'';document.getElementById('pay-sso-a').textContent=pm==='sso'&&subtotal?fn(net):'';document.getElementById('receipt-preview-wrap').style.display='block';if(!document.getElementById('page-receipt').classList.contains('active'))switchTab('receipt');setTimeout(()=>document.getElementById('receipt-preview-wrap').scrollIntoView({behavior:'smooth',block:'start'}),100);}
-
-function editReceiptNo(){
-  if(!(currentUser&&currentUser.role==='admin')){toast('เฉพาะ Admin เท่านั้นที่แก้ไขได้');return;}
-  const found=findVisitById(currentReceiptId);if(!found)return;
-  const cur=(found.visit.rNo!==undefined&&found.visit.rNo!==null)?String(found.visit.rNo):'';
-  const val=prompt('แก้ไขเลขที่ใบเสร็จ:',cur);
-  if(val===null)return;
-  const trimmed=val.trim();
-  if(trimmed===''){toast('กรุณากรอกเลขที่ใบเสร็จ');return;}
-  found.visit.rNo=trimmed;
-  sp();
-  document.getElementById('r-no').textContent=String(trimmed).padStart(4,'0');
-  renderTable();renderReceiptList();
-  toast('แก้ไขเลขที่ใบเสร็จเรียบร้อย');
-}
-function closeReceipt(){document.getElementById('receipt-preview-wrap').style.display='none';}
-
-function printReceipt(){const content=document.getElementById('receipt-doc').outerHTML;const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>ใบเสร็จ - วอทเดอะทูธ</title><style>@page{size:A5 portrait;margin:8mm;}*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Sarabun','TH Sarabun New','Angsana New',sans-serif;font-size:12px;background:#fff;color:#000;}#receipt-doc{width:100%;border:1.5px solid #7B68AB;}.r-hdr{display:flex;align-items:flex-start;padding:8px 12px;border-bottom:2px solid #7B68AB;gap:10px;}.r-logo-area{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:80px;}.r-cinfo{flex:1;text-align:right;}.r-cname-th{font-size:14px;font-weight:800;color:#5B3A8A;line-height:1.3;}.r-cname-en{font-size:12px;font-weight:700;color:#5B3A8A;}.r-caddr{font-size:10px;color:#333;margin-top:2px;line-height:1.6;}.r-infobar{background:#7B68AB;color:#fff;display:grid;grid-template-columns:2fr 0.6fr 0.9fr 1.2fr;}.r-ic{padding:5px 8px;border-right:1px solid rgba(255,255,255,0.2);}.r-ic:last-child{border-right:none;position:relative;}.r-il{font-size:9px;opacity:0.85;margin-bottom:1px;}.r-iv{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.r-stamp{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#5B3A8A;color:#fff;border:2px solid #fff;border-radius:4px;padding:3px 7px;font-size:10px;font-weight:800;text-align:center;line-height:1.4;}.r-patient{display:grid;grid-template-columns:1.2fr 0.8fr;border-bottom:1px solid #bbb;}.r-pc{padding:5px 10px;}.r-pc:first-child{border-right:1px solid #bbb;}.r-pf{display:flex;align-items:baseline;gap:3px;margin-bottom:3px;font-size:11.5px;}.r-pl{color:#555;white-space:nowrap;min-width:66px;font-size:11px;}.r-pv{font-weight:700;border-bottom:1px solid #aaa;flex:1;padding-bottom:1px;font-size:11.5px;}.r-table{width:100%;border-collapse:collapse;font-size:11.5px;}.r-table th{background:#EDE7F6;border:1px solid #9B8EC4;padding:4px 6px;text-align:center;font-weight:700;font-size:11px;color:#3a1a6a;}.r-table td{border:1px solid #ccc;padding:3px 6px;}.tno{text-align:center;width:26px;}.tqty{text-align:center;width:42px;}.tprice{text-align:right;width:72px;}.tdisc{text-align:right;width:62px;}.ttotal{text-align:right;width:78px;font-weight:700;}.erow td{height:18px;}.r-baht{padding:4px 12px;font-size:11px;color:#3a1a6a;font-style:italic;border-bottom:1px solid #bbb;background:#faf8ff;}.r-bottom{display:flex;font-size:11.5px;}.r-paycol{flex:1;padding:7px 10px;border-right:1.5px solid #bbb;}.r-paytitle{font-weight:700;font-size:11px;color:#5B3A8A;margin-bottom:5px;text-transform:uppercase;}.r-payopt{display:flex;align-items:center;gap:5px;margin-bottom:5px;font-size:11.5px;}.r-circle{width:13px;height:13px;border:1.5px solid #666;border-radius:50%;flex-shrink:0;display:inline-block;}.r-circle.checked{border-color:#5B3A8A;background:#5B3A8A;}.r-payline{border-bottom:1px dotted #aaa;flex:1;margin:0 4px;}.r-payamt{min-width:52px;text-align:right;font-weight:700;font-size:11.5px;}.r-sumcol{width:200px;flex-shrink:0;display:flex;flex-direction:column;}.r-sumrow{display:flex;border-bottom:1px solid #ddd;font-size:11.5px;}.r-sumrow:last-child{border-bottom:none;}.r-sumlbl{flex:1;padding:4px 8px;color:#444;border-right:1px solid #ddd;font-size:11px;display:flex;align-items:center;}.r-sumval-wrap{display:flex;}.r-sumval{width:70px;padding:4px 6px;text-align:right;font-weight:600;border-right:1px solid #ddd;font-size:11.5px;}.r-sumval:last-child{border-right:none;}.r-grandrow{background:#5B3A8A;color:#fff;font-weight:700;font-size:12px;display:flex;}.r-grandrow .r-sumlbl{color:#fff;border-right-color:rgba(255,255,255,0.3);}.r-grandrow .r-sumval{color:#fff;border-right-color:rgba(255,255,255,0.3);}.r-sig{display:flex;border-top:1px solid #bbb;font-size:12px;text-align:center;}.r-sigbox{flex:1;padding:8px 10px 10px;border-right:1px solid #bbb;display:flex;flex-direction:column;align-items:center;gap:2px;}.r-sigbox:last-child{border-right:none;}.r-sigline{border-bottom:1px solid #999;width:80%;margin:16px auto 4px;}.r-siglbl{color:#666;font-size:11.5px;}.r-signame{font-weight:700;font-size:11px;}.r-wm{display:none;}@media print{body{padding:0;}#receipt-doc{border:none;width:100%;}}</style>
-</head><body>${content}</body></html>`);w.document.close();setTimeout(()=>{w.focus();w.print();},500);}
-
-function updateStats(){const all=flattenVisits();document.getElementById('s-total').textContent=all.length;document.getElementById('s-today').textContent=all.filter(r=>r.date===today).length;document.getElementById('s-proc').textContent=all.reduce((s,r)=>s+r.procedures.length,0);document.getElementById('s-rev').textContent='฿'+all.reduce((s,r)=>s+(r.price||0),0).toLocaleString('th-TH');}
-function addUser(){const u=document.getElementById('nu-user').value.trim(),p=document.getElementById('nu-pass').value.trim();if(!u||!p){toast('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');return;}if(users.find(x=>x.username===u)){toast('ชื่อผู้ใช้นี้มีอยู่แล้ว');return;}users.push({id:Date.now(),username:u,password:p,name:document.getElementById('nu-name').value.trim()||u,role:document.getElementById('nu-role').value});su();renderUserList();['nu-user','nu-pass','nu-name'].forEach(id=>document.getElementById(id).value='');toast('เพิ่มผู้ใช้เรียบร้อย');}
-function delUser(id){if(currentUser&&currentUser.id===id){toast('ไม่สามารถลบบัญชีตัวเองได้');return;}users=users.filter(u=>u.id!==id);su();renderUserList();}
-function renderUserList(){const el=document.getElementById('user-list');if(!users.length){el.innerHTML='<div class="empty"><i class="ti ti-user-off"></i>ไม่มีผู้ใช้</div>';return;}el.innerHTML=users.map(u=>`<div class="u-row"><div class="row-inner"><div class="u-av ${u.role==='staff'?'staff':''}">${(u.name||u.username).slice(0,2).toUpperCase()}</div><div><div style="font-size:13px;font-weight:600;">${u.name||u.username} <span class="badge ${u.role==='admin'?'bp':'bt'}" style="margin-left:4px;">${u.role==='admin'?'Admin':'Staff'}</span></div><div style="font-size:11px;color:var(--text2);">@${u.username}</div></div></div><div style="display:flex;gap:4px;align-items:center;"><button class="btn-del" onclick="changePassword(${u.id})" title="เปลี่ยนรหัสผ่าน" style="color:var(--purple);"><i class="ti ti-key"></i></button>${u.id!==1?`<button class="btn-del" onclick="delUser(${u.id})"><i class="ti ti-trash"></i></button>`:'<span style="font-size:11px;color:var(--text3);">ค่าเริ่มต้น</span>'}</div></div>`).join('');}
-function changePassword(id){
-  const u=users.find(x=>x.id===id);if(!u)return;
-  const p1=prompt('ตั้งรหัสผ่านใหม่สำหรับ @'+u.username+' :');
-  if(p1===null)return;
-  if(!p1.trim()){toast('กรุณากรอกรหัสผ่าน');return;}
-  const p2=prompt('กรอกรหัสผ่านใหม่อีกครั้งเพื่อยืนยัน:');
-  if(p2===null)return;
-  if(p1.trim()!==p2.trim()){toast('รหัสผ่านไม่ตรงกัน กรุณาทำใหม่');return;}
-  u.password=p1.trim();su();toast('เปลี่ยนรหัสผ่านเรียบร้อย');
-}
-
-function setDashRange(mode){
-  const d=new Date();
-  if(mode==='today'){
-    document.getElementById('dash-start').value=today;
-    document.getElementById('dash-end').value=today;
-  }else if(mode==='month'){
-    const first=new Date(d.getFullYear(),d.getMonth(),1).toISOString().split('T')[0];
-    document.getElementById('dash-start').value=first;
-    document.getElementById('dash-end').value=today;
-  }
-  renderDashboard();
-}
-function renderDashboard(){
-  if(!(currentUser&&currentUser.role==='admin'))return;
-  const start=document.getElementById('dash-start').value;
-  const end=document.getElementById('dash-end').value;
-  const f=flattenVisits().filter(r=>{
-    if(start&&r.date<start)return false;
-    if(end&&r.date>end)return false;
-    return true;
-  });
-  const pIds=new Set(f.map(r=>r.patientId||r.id));
-  document.getElementById('dash-total-patients').textContent=pIds.size;
-  document.getElementById('dash-total-procs').textContent=f.reduce((s,r)=>s+((r.procedures||r.items||[]).length),0);
-  document.getElementById('dash-total-rev').textContent='฿'+f.reduce((s,r)=>s+(r.price||r.total||0),0).toLocaleString('th-TH');
-  const byDayDoc={};
-  f.forEach(r=>{
-    const key=r.date+'|'+r.dentistId;
-    if(!byDayDoc[key])byDayDoc[key]={date:r.date,dentistId:r.dentistId,pIds:new Set(),procs:0,rev:0};
-    byDayDoc[key].pIds.add(r.patientId||r.id);
-    byDayDoc[key].procs+=(r.procedures||r.items||[]).length;
-    byDayDoc[key].rev+=(r.price||r.total||0);
-  });
-  const rows=Object.values(byDayDoc).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0);
-  document.getElementById('dash-empty').style.display=rows.length?'none':'block';
-  document.getElementById('dash-table-body').innerHTML=rows.map(x=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(x.date)}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(x.dentistId)}</span></td><td>${x.pIds.size}</td><td>${x.procs}</td><td class="price-green">${fp(x.rev)}</td></tr>`).join('');
-  const byDoc={};
-  f.forEach(r=>{
-    const key=r.dentistId;
-    if(!byDoc[key])byDoc[key]={dentistId:r.dentistId,pIds:new Set(),procs:0,rev:0};
-    byDoc[key].pIds.add(r.patientId||r.id);
-    byDoc[key].procs+=(r.procedures||r.items||[]).length;
-    byDoc[key].rev+=(r.price||r.total||0);
-  });
-  const sumRows=Object.values(byDoc).sort((a,b)=>b.rev-a.rev);
-  document.getElementById('dash-summary-empty').style.display=sumRows.length?'none':'block';
-  document.getElementById('dash-summary-body').innerHTML=sumRows.map(x=>`<tr><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(x.dentistId)}</span></td><td>${x.pIds.size}</td><td>${x.procs}</td><td class="price-green">${fp(x.rev)}</td></tr>`).join('');
-
-  // ─── สรุปยอดตามวิธีชำระเงิน ───────────────────────────────────────────────
-  const payTotals={cash:0,transfer:0,card:0,sso:0};
-  const payCounts={cash:0,transfer:0,card:0,sso:0};
-  f.forEach(r=>{
-    const k=r.payment||'cash';
-    if(payTotals[k]===undefined)return;
-    payTotals[k]+=(r.price||r.total||0);
-    payCounts[k]+=1;
-  });
-  ['cash','transfer','card','sso'].forEach(k=>{
-    document.getElementById('dash-pay-'+k).textContent=fp(payTotals[k]);
-    document.getElementById('dash-pay-'+k+'-cnt').textContent=payCounts[k]+' ครั้ง';
-  });
-
-  // ─── คนไข้จองโปรโมชั่นจัดฟันใหม่ แยกตามเดือน ─────────────────────────────
-  const orthoByMonth={};
-  f.forEach(r=>{
-    if(!(r.procedures||[]).includes(ORTHO_PROMO_PROC))return;
-    const month=(r.date||'').slice(0,7);
-    if(!month)return;
-    if(!orthoByMonth[month])orthoByMonth[month]={month,patients:new Map()};
-    orthoByMonth[month].patients.set(r.patientId||r.id, r.name);
-  });
-  const orthoRows=Object.values(orthoByMonth).sort((a,b)=>b.month.localeCompare(a.month));
-  document.getElementById('dash-ortho-empty').style.display=orthoRows.length?'none':'block';
-  document.getElementById('dash-ortho-body').innerHTML=orthoRows.map(x=>{
-    const names=[...x.patients.values()];
-    return `<tr><td style="font-weight:600;">${fmtMonthTH(x.month)}</td><td class="price-green" style="font-weight:700;">${x.patients.size} คน</td><td style="font-size:11px;">${names.join(', ')||'-'}</td></tr>`;
-  }).join('');
-}
-
-let toastTimer;
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);}
-
-
-</script>
 </head>
 <body>
 
@@ -1630,5 +973,664 @@ tr:hover td { background: var(--bg); }
 
 
 
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script>
+
+
+const BRANCHES = {
+  branch1: { key:'branch1', name:'สาขาเทพารักษ์', nameEn:'Thepharak Branch', cls:'b1' },
+  branch2: { key:'branch2', name:'สาขาศรีนครินทร์', nameEn:'Srinakarin Branch', cls:'b2' }
+};
+
+const PROC_GROUPS=[
+  {label:'🦷 ทันตกรรมทั่วไป',cls:'',items:['ขูดหินปูน','อุดฟัน','ถอนฟัน','ผ่าฟันคุด','เกลารากฟัน']},
+  {label:'👑 ทันตกรรมบูรณะ',cls:'',items:['รากเทียม','ครอบฟัน','สะพานฟัน','ฟันปลอมฐานพลาสติก','ฟันปลอมฐานโลหะ','ฟันปลอมทั้งปาก']},
+  {label:'🔧 จัดฟัน',cls:'ortho',items:['ปรับเครื่องมือจัดฟัน','ติดอุปกรณ์หลุด','ติดอุปกรณ์จัดฟันบน','ติดอุปกรณ์จัดฟันล่าง','จองโปรโมชั่นจัดฟัน']},
+  {label:'📷 เอกซเรย์',cls:'xray',items:['ถ่ายเอกซเรย์ฟิล์มเล็ก','ถ่ายเอกซเรย์ฟิล์มใหญ่']}
+];
+const ALL_PROCS=PROC_GROUPS.flatMap(g=>g.items);
+const BC=['bt','bb','bc','bp','ba','bpk','bi','bg'];
+const pcm={}; let ci=0;
+function gpc(p){if(!pcm[p])pcm[p]=BC[ci++%BC.length];return pcm[p];}
+ALL_PROCS.forEach(p=>gpc(p));
+
+// ─── Firebase ───────────────────────────────────────────────────────────────
+// ─── Firebase ───────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCPJeGGyUe4Lz7zH00t8U2pbNkuhTpP8ik",
+  authDomain: "wtt-dental.firebaseapp.com",
+  databaseURL: "https://wtt-dental-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "wtt-dental",
+  storageBucket: "wtt-dental.firebasestorage.app",
+  messagingSenderId: "474856182089",
+  appId: "1:474856182089:web:68dbeafa16b8c58d848a98"
+};
+let db = null;
+function initFirebase(){if(db)return; // init once only
+  try {
+    if(typeof firebase !== 'undefined'){
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      console.log('Firebase ready');
+    } else { console.warn('Firebase not loaded, using localStorage'); }
+  } catch(e){ console.warn('Firebase init error:', e); }
+}
+initFirebase();
+
+// helpers
+function fbSet(path, data){ if(!db) return Promise.resolve(); return db.ref(path).set(data); }
+async function fbGet(path){ if(!db) return null; const snap = await db.ref(path).once('value'); return snap.exists() ? snap.val() : null; }
+
+function sp(){ fbSet('branches/'+currentBranch.key+'/patients', patients); try{localStorage.setItem('wtt_patients_'+currentBranch.key,JSON.stringify(patients));}catch(e){} }
+function sd(){ fbSet('branches/'+currentBranch.key+'/dentists', dentists); try{localStorage.setItem('wtt_dentists_'+currentBranch.key,JSON.stringify(dentists));}catch(e){} }
+function sc(){ fbSet('branches/'+currentBranch.key+'/clinic', clinic); try{localStorage.setItem('wtt_clinic_'+currentBranch.key,JSON.stringify(clinic));}catch(e){} }
+function su(){ fbSet('global/users', users); try{localStorage.setItem('wtt_users',JSON.stringify(users));}catch(e){} }
+
+const DEFAULT_USERS = [
+  {id:1,username:'admin',password:'admin1234',name:'ผู้ดูแลระบบ',role:'admin'},
+  {id:2,username:'staff',password:'staff1234',name:'เจ้าหน้าที่',role:'staff'}
+];
+
+// ─── Migration: เดิม branches/{bkey}/records (flat) → branches/{bkey}/patients (nested) ──
+// ทำครั้งเดียวต่อสาขา, ไม่แตะ/ลบข้อมูลเดิม, มี guard กันรันซ้ำ
+async function migrateOldRecordsIfNeeded(bkey){
+  if(!db) return;
+  try{
+    const done = await fbGet('branches/'+bkey+'/migrationDone');
+    if(done===true) return;
+    const oldRecs = await fbGet('branches/'+bkey+'/records');
+    if(!oldRecs){ await fbSet('branches/'+bkey+'/migrationDone', true); return; }
+    const flat = Object.values(oldRecs);
+    const groups={};
+    flat.forEach(r=>{
+      const key = (r.dn&&r.dn.trim()) ? 'dn:'+r.dn.trim() : 'nk:'+(r.name||'').trim().toLowerCase()+'|'+(r.pid||'')+'|'+(r.tel||'');
+      (groups[key]=groups[key]||[]).push(r);
+    });
+    const newPatients={};
+    Object.values(groups).forEach(recs=>{
+      recs.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+      const first=recs[0];
+      const patientId='mig_'+(first.dn?first.dn:first.id);
+      const visits={};
+      recs.forEach(r=>{
+        const visitId='mig_v_'+r.id;
+        const price=r.price||0, discount=r.discount||0;
+        visits[visitId]={
+          id:visitId, rNo:r.rNo, date:r.date, dentistId:r.dentistId, dentition:'adult',
+          items:[{procedure:(r.procedures||[]).join(', ')||'รวมยอดเดิม', tooth:'', surfaces:[], price}],
+          discount, subtotal:price, total:price-discount,
+          payment:r.payment||'cash', note:r.note||'', by:r.by||''
+        };
+      });
+      newPatients[patientId]={
+        id:patientId, dn:first.dn||'', name:first.name, pid:first.pid||'',
+        birthdate:'', age:first.age||'', tel:first.tel||'',
+        createdAt:Date.now(), createdBy:'migration', visits
+      };
+    });
+    const existing = (await fbGet('branches/'+bkey+'/patients')) || {};
+    const merged = {...newPatients, ...existing};
+    await fbSet('branches/'+bkey+'/patients', merged);
+    await fbSet('branches/'+bkey+'/migrationDone', true);
+  }catch(e){ console.warn('Migration failed:', e); }
+}
+
+async function loadBranchData(bkey) {
+  showLoading(true);
+  let p={}, d=[], c={}, u=[];
+  // โหลด localStorage ก่อนเสมอ (fallback ทันที)
+  try{p=JSON.parse(localStorage.getItem('wtt_patients_'+bkey)||'{}');}catch(e){}
+  try{d=JSON.parse(localStorage.getItem('wtt_dentists_'+bkey)||'[]');}catch(e){}
+  try{c=JSON.parse(localStorage.getItem('wtt_clinic_'+bkey)||'{}');}catch(e){}
+  try{u=JSON.parse(localStorage.getItem('wtt_users')||'[]');}catch(e){}
+  if(!u.length){ u=[...DEFAULT_USERS]; try{localStorage.setItem('wtt_users',JSON.stringify(u));}catch(e){} }
+  // ลอง Firebase เพิ่มเติม (ถ้าออนไลน์)
+  try {
+    await migrateOldRecordsIfNeeded(bkey);
+    const snap = await Promise.race([
+      db.ref('branches/'+bkey).once('value'),
+      new Promise((_,rej)=>setTimeout(()=>rej('timeout'),3000))
+    ]);
+    const gsnap = await db.ref('global/users').once('value');
+    if(snap.exists()){
+      const v = snap.val();
+      if(v.patients) p = v.patients;
+      if(v.dentists) d = Object.values(v.dentists);
+      if(v.clinic) c = v.clinic;
+    }
+    if(gsnap.exists()){ u = Object.values(gsnap.val()); }
+  } catch(e) { /* ใช้ข้อมูล localStorage ที่โหลดไปแล้ว */ }
+  showLoading(false);
+  return {patients:p, dentists:d, clinic:c, users:u};
+}
+
+// Real-time listener
+let fbListeners = [];
+function startRealtimeSync(bkey){
+  try{ if(!db){console.log("No DB, skip sync");return;} }catch(e){return;}
+  stopRealtimeSync();
+  const h1 = db.ref('branches/'+bkey+'/patients').on('value', snap=>{
+    if(!currentBranch)return;
+    const newPatients = snap.exists() ? snap.val() : {};
+    if(JSON.stringify(newPatients)!==JSON.stringify(patients)){
+      patients = newPatients;
+      renderTable(); updateStats(); renderReceiptList();
+      if(document.getElementById('dash-start').value) renderDashboard();
+    }
+  });
+  const h2 = db.ref('branches/'+bkey+'/dentists').on('value', snap=>{
+    if(!currentBranch)return;
+    dentists = snap.exists() ? Object.values(snap.val()) : [];
+    rdl(); rds();
+  });
+  const h3 = db.ref('global/users').on('value', snap=>{
+    if(!currentBranch)return;
+    users = snap.exists() ? Object.values(snap.val()) : [];
+    renderUserList();
+  });
+  fbListeners = [
+    {r: db.ref('branches/'+bkey+'/patients'), h: h1},
+    {r: db.ref('branches/'+bkey+'/dentists'), h: h2},
+    {r: db.ref('global/users'), h: h3}
+  ];
+}
+function stopRealtimeSync(){
+  fbListeners.forEach(({r,h})=>r.off('value',h));
+  fbListeners=[];
+}
+
+function showLoading(show){
+  let el=document.getElementById('fb-loading');
+  if(!el && !show) return;
+  if(!el){
+    el=document.createElement('div');
+    el.id='fb-loading';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-size:15px;color:#5B3A8A;gap:10px;';
+    el.innerHTML='<i class="ti ti-cloud-download" style="font-size:32px;animation:spin 1s linear infinite;"></i><div>กำลังโหลดข้อมูล...</div>';
+    document.body.appendChild(el);
+  }
+  el.style.display=show?'flex':'none';
+}
+
+// ─── /Firebase ──────────────────────────────────────────────────────────────
+
+let currentUser=null, currentBranch=null, selBranch=null;
+let patients={},dentists=[],clinic={},users=[];
+let selProcs=[],rCnt=1,currentReceiptId=null;
+let currentVisitItems=[], chartMode='adult', selectedTooth=null, selectedSurfaces=[];
+const today=new Date().toISOString().split('T')[0];
+
+const ADULT_QUADS = {
+  ur:[18,17,16,15,14,13,12,11],
+  ul:[21,22,23,24,25,26,27,28],
+  lr:[48,47,46,45,44,43,42,41],
+  ll:[31,32,33,34,35,36,37,38]
+};
+const CHILD_QUADS = {
+  ur:[55,54,53,52,51],
+  ul:[61,62,63,64,65],
+  lr:[85,84,83,82,81],
+  ll:[71,72,73,74,75]
+};
+// ฟันหน้า (Anterior: incisor/canine, FDI last digit 1-3): Mesial, Distal, Labial, Palatal/Lingual, Incisal
+const SURF_ANTERIOR=[{code:'M',label:'Mesial'},{code:'D',label:'Distal'},{code:'L',label:'Labial'},{code:'P',label:'Palatal/Lingual'},{code:'I',label:'Incisal'}];
+// ฟันหลัง (Posterior: premolar/molar, FDI last digit 4-8): Mesial, Distal, Buccal, Lingual, Occlusal
+const SURF_POSTERIOR=[{code:'M',label:'Mesial'},{code:'D',label:'Distal'},{code:'B',label:'Buccal'},{code:'L',label:'Lingual'},{code:'O',label:'Occlusal'}];
+
+function toothLastDigit(fdi){ return Number(String(fdi).slice(-1)); }
+function isAnteriorTooth(fdi){ return toothLastDigit(fdi)<=3; }
+function toothTypeOf(fdi){
+  const last=toothLastDigit(fdi);
+  if(last<=2) return 'incisor';
+  if(last===3) return 'canine';
+  if(last===4) return 'premolar';
+  return 'molar';
+}
+
+// ─── เรขาคณิตของผังฟันรูปโค้ง (arch geometry) ───────────────────────────────
+const ARCH = { cx:380, cyMid:230, rx:300, ryU:170, ryL:170, thetaStart:170, thetaEnd:10 };
+
+function archPoint(idx, count, upper){
+  const t = count===1 ? 0.5 : idx/(count-1);
+  const thetaDeg = ARCH.thetaStart - t*(ARCH.thetaStart-ARCH.thetaEnd);
+  const theta = thetaDeg*Math.PI/180;
+  const x = ARCH.cx + ARCH.rx*Math.cos(theta);
+  const y = upper ? (ARCH.cyMid - ARCH.ryU*Math.sin(theta)) : (ARCH.cyMid + ARCH.ryL*Math.sin(theta));
+  return {x, y, cx:ARCH.cx, cy:ARCH.cyMid};
+}
+function rotForPoint(p){
+  const dx=p.x-p.cx, dy=p.y-p.cy;
+  const len=Math.hypot(dx,dy)||1;
+  const ux=dx/len, uy=dy/len;
+  return Math.atan2(-ux, uy)*180/Math.PI;
+}
+function archPoints(upper, pad){
+  const N=40; const pts=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const thetaDeg=ARCH.thetaStart - t*(ARCH.thetaStart-ARCH.thetaEnd);
+    const theta=thetaDeg*Math.PI/180;
+    const x=ARCH.cx+(ARCH.rx+pad)*Math.cos(theta);
+    const y=upper ? (ARCH.cyMid-(ARCH.ryU+pad)*Math.sin(theta)) : (ARCH.cyMid+(ARCH.ryL+pad)*Math.sin(theta));
+    pts.push([x,y]);
+  }
+  return pts;
+}
+function pathFromPoints(pts){
+  return pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+}
+function gumBandD(upper){
+  const outer=archPoints(upper,40);
+  const inner=archPoints(upper,-22).reverse();
+  return pathFromPoints(outer)+' '+pathFromPoints(inner).replace(/^M/,'L')+' Z';
+}
+
+// รูปทรงฟันแต่ละประเภท (local coords, origin ~กึ่งกลางฟัน, แกน y ลง = รากฟัน)
+function toothShapeMarkup(type){
+  switch(type){
+    case 'incisor':
+      return { crown:'M -6,-15 Q -6,-17 -3,-17 L 3,-17 Q 6,-17 6,-15 L 6,-2 Q 6,1.5 0,1.5 Q -6,1.5 -6,-2 Z',
+                root:'M -3.2,-1 Q -4.2,10 -1.5,15.5 Q 0,17.5 1.5,15.5 Q 4.2,10 3.2,-1 Z' };
+    case 'canine':
+      return { crown:'M -6,-2 Q -6.5,-9.5 -1,-17.5 Q 0,-19.5 1,-17.5 Q 6.5,-9.5 6,-2 Q 0,2.2 -6,-2 Z',
+                root:'M -3.2,-2 Q -4.4,10 -1.5,16.5 Q 0,18.5 1.5,16.5 Q 4.4,10 3.2,-2 Z' };
+    case 'premolar':
+      return { crown:'M -7.5,-3 Q -8,-13 -3.5,-15 Q -1.5,-16.5 0,-14.5 Q 1.5,-16.5 3.5,-15 Q 8,-13 7.5,-3 Q 0,2.2 -7.5,-3 Z',
+                root:'M -4,-2 Q -5.6,9 -3,15 Q -1.2,18 0,15.5 Q 1.2,18 3,15 Q 5.6,9 4,-2 Z' };
+    case 'molar':
+    default:
+      return { crown:'M -10,-4 Q -10.5,-14 -6,-16 Q -3,-17.5 0,-15.5 Q 3,-17.5 6,-16 Q 10.5,-14 10,-4 Q 0,3 -10,-4 Z',
+                root:'M -6,-3 Q -8,9 -4,15.5 Q -2,18.5 0,15 Q 2,18.5 4,15.5 Q 8,9 6,-3 Z' };
+  }
+}
+function fdiListsForMode(mode){
+  const q = mode==='adult' ? ADULT_QUADS : CHILD_QUADS;
+  return { upper:[...q.ur, ...q.ul], lower:[...q.lr, ...q.ll] };
+}
+
+function selectBranch(bkey) {
+  selBranch = bkey;
+  document.querySelectorAll('.branch-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector('.branch-btn[data-branch="'+bkey+'"]').classList.add('selected');
+}
+
+async function doLogin(){
+  // เช็ค DEFAULT_USERS ก่อนเสมอ
+  if(!selBranch){toast('กรุณาเลือกสาขาก่อน');return;}
+  const u=document.getElementById('login-user').value.trim();
+  const p=document.getElementById('login-pass').value;
+  // ตรวจสอบ default users ก่อนเลย (ไม่ต้องรอ Firebase)
+  let checkUsers = [...DEFAULT_USERS];
+  try{const lu=JSON.parse(localStorage.getItem('wtt_users')||'[]');if(lu.length)checkUsers=lu;}catch(e){}
+  let found = checkUsers.find(x=>x.username===u&&x.password===p);
+  if(!found){toast('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');return;}
+  // login สำเร็จ — โหลดข้อมูลสาขา
+  const data=await loadBranchData(selBranch);
+  // อัปเดต found จาก Firebase ถ้าโหลดได้
+  if(data.users && data.users.length){
+    const fbFound=data.users.find(x=>x.username===u&&x.password===p);
+    if(fbFound) found=fbFound;
+  }
+  document.getElementById('login-err').classList.remove('show');
+  currentUser=found; currentBranch=BRANCHES[selBranch];
+  patients=data.patients; dentists=data.dentists; clinic=data.clinic; users=data.users;
+  // นับ receipt counter
+  const allVisits=flattenVisits();
+  if(allVisits.length){const nums=allVisits.map(r=>parseInt(r.rNo)).filter(n=>!isNaN(n));rCnt=nums.length?Math.max(...nums)+1:1;}
+
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-screen').classList.remove('hidden');
+  document.getElementById('topbar-user').textContent=found.name||found.username;
+  const rb=document.getElementById('topbar-role');rb.textContent=found.role==='admin'?'Admin':'Staff';rb.className='role-tag '+(found.role==='admin'?'role-admin':'role-staff');
+  document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden',found.role!=='admin'));
+
+  // อัปเดต branch UI
+  const tbi=document.getElementById('tb-icon');
+  tbi.className='topbar-icon '+currentBranch.cls;
+  const tbb=document.getElementById('tb-branch-badge');
+  tbb.textContent=currentBranch.name; tbb.className='branch-badge '+currentBranch.cls;
+  document.getElementById('branch-indicator').textContent=currentBranch.name;
+  document.getElementById('branch-indicator').className='branch-badge '+currentBranch.cls;
+  // active tab color
+  document.querySelectorAll('.tab-btn.active').forEach(b=>{ b.classList.remove('b1-active','b2-active'); b.classList.add(currentBranch.cls+'-active'); });
+
+  document.getElementById('f-date').value=today;
+  rds();rdl();renderTable();updateStats();loadSettings();setChartMode('adult');
+  startRealtimeSync(selBranch);
+}
+function doSignOut(){stopRealtimeSync();currentUser=null;currentBranch=null;selBranch=null;document.getElementById('app-screen').classList.add('hidden');document.getElementById('login-screen').classList.remove('hidden');document.getElementById('login-user').value='';document.getElementById('login-pass').value='';document.querySelectorAll('.branch-btn').forEach(b=>b.classList.remove('selected'));switchTab('record');}
+
+function loadSettings(){
+  document.getElementById('settings-branch-name').textContent=currentBranch?currentBranch.name:'';
+  if(clinic.addr)document.getElementById('s-addr').value=clinic.addr;else document.getElementById('s-addr').value='';
+  if(clinic.tel)document.getElementById('s-tel').value=clinic.tel;else document.getElementById('s-tel').value='';
+  if(clinic.bookNo)document.getElementById('s-bookno').value=clinic.bookNo;else document.getElementById('s-bookno').value='';
+}
+function saveSettings(){clinic.addr=document.getElementById('s-addr').value.trim();clinic.tel=document.getElementById('s-tel').value.trim();clinic.bookNo=document.getElementById('s-bookno').value.trim()||'0009';sc();toast('บันทึกเรียบร้อย');}
+
+// สร้างปุ่มหัตถการ (เลือกได้ทีละ 1 รายการ สำหรับสร้างรายการหัตถการที่กำลังเพิ่ม)
+const qp=document.getElementById('proc-quick');
+PROC_GROUPS.forEach(g=>{const gd=document.createElement('div');const lb=document.createElement('div');lb.className='proc-group-lbl';lb.textContent=g.label;gd.appendChild(lb);const bd=document.createElement('div');bd.className='proc-group-btns';g.items.forEach(p=>{const b=document.createElement('button');b.type='button';b.className='pq-btn'+(g.cls?' '+g.cls:'');b.textContent=p;b.onclick=()=>{
+  const already=selProcs[0]===p;
+  document.querySelectorAll('#proc-quick .pq-btn.sel').forEach(x=>x.classList.remove('sel'));
+  if(already){selProcs=[];}else{selProcs=[p];b.classList.add('sel');}
+};bd.appendChild(b);});gd.appendChild(bd);qp.appendChild(gd);});
+
+// ─── ผังฟัน (Interactive SVG Dental Chart, FDI notation) ───────────────────
+function setChartMode(mode){
+  chartMode=mode; selectedTooth=null; selectedSurfaces=[];
+  document.getElementById('btn-mode-adult').classList.toggle('sel',mode==='adult');
+  document.getElementById('btn-mode-child').classList.toggle('sel',mode==='child');
+  renderToothChart(); renderSurfacePicker();
+}
+function toothGroupMarkup(fdi, p, rot){
+  const sel = selectedTooth===String(fdi);
+  const shp = toothShapeMarkup(toothTypeOf(fdi));
+  const dx=p.x-p.cx, dy=p.y-p.cy; const len=Math.hypot(dx,dy)||1;
+  const ux=dx/len, uy=dy/len;
+  const lx=p.x+ux*26, ly=p.y+uy*26;
+  return `<g class="tooth-shape${sel?' sel':''}" onclick="selectTooth('${fdi}')" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)}) rotate(${rot.toFixed(1)})">
+      <path class="tooth-root" d="${shp.root}"></path>
+      <path class="tooth-crown" d="${shp.crown}"></path>
+    </g>
+    <text class="tooth-num${sel?' sel':''}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" onclick="selectTooth('${fdi}')">${fdi}</text>`;
+}
+function renderToothChart(){
+  const {upper, lower} = fdiListsForMode(chartMode);
+  const upperMk = upper.map((fdi,i)=>toothGroupMarkup(fdi, archPoint(i,upper.length,true), rotForPoint(archPoint(i,upper.length,true)))).join('');
+  const lowerMk = lower.map((fdi,i)=>toothGroupMarkup(fdi, archPoint(i,lower.length,false), rotForPoint(archPoint(i,lower.length,false)))).join('');
+  document.getElementById('tooth-chart').innerHTML = `
+    <svg viewBox="0 0 760 460" class="tooth-svg" xmlns="http://www.w3.org/2000/svg">
+      <path class="tc-gumband" d="${gumBandD(true)}"></path>
+      <path class="tc-gumband" d="${gumBandD(false)}"></path>
+      <line x1="60" y1="230" x2="700" y2="230" class="tc-midline"></line>
+      ${upperMk}
+      ${lowerMk}
+    </svg>`;
+}
+function selectTooth(fdi){
+  selectedTooth = (selectedTooth===String(fdi)) ? null : String(fdi);
+  selectedSurfaces=[];
+  renderToothChart(); renderSurfacePicker();
+}
+function renderSurfacePicker(){
+  const el=document.getElementById('surface-picker');
+  if(!selectedTooth){el.innerHTML='';return;}
+  const fdi=selectedTooth;
+  const anterior=isAnteriorTooth(fdi);
+  const set=anterior?SURF_ANTERIOR:SURF_POSTERIOR;
+  const byCode=c=>set.find(s=>s.code===c);
+  const top=byCode(anterior?'L':'B'), bottom=byCode(anterior?'P':'L'), left=byCode('M'), right=byCode('D'), center=byCode(anterior?'I':'O');
+  const isSel=c=>selectedSurfaces.includes(c);
+  const centerSel=isSel(center.code);
+  const svg=`<svg viewBox="0 0 120 120" class="surf-target" xmlns="http://www.w3.org/2000/svg">
+      <polygon class="surf-region${isSel(top.code)?' sel':''}" points="10,10 110,10 60,60" onclick="toggleSurface('${top.code}')"></polygon>
+      <polygon class="surf-region${isSel(right.code)?' sel':''}" points="110,10 110,110 60,60" onclick="toggleSurface('${right.code}')"></polygon>
+      <polygon class="surf-region${isSel(bottom.code)?' sel':''}" points="110,110 10,110 60,60" onclick="toggleSurface('${bottom.code}')"></polygon>
+      <polygon class="surf-region${isSel(left.code)?' sel':''}" points="10,110 10,10 60,60" onclick="toggleSurface('${left.code}')"></polygon>
+      <circle class="surf-center${centerSel?' sel':''}" cx="60" cy="60" r="21" onclick="toggleSurface('${center.code}')"></circle>
+      <text class="surf-label" x="60" y="5" text-anchor="middle" dominant-baseline="hanging">${top.code}</text>
+      <text class="surf-label" x="115" y="60" text-anchor="end" dominant-baseline="middle">${right.code}</text>
+      <text class="surf-label" x="60" y="115" text-anchor="middle" dominant-baseline="auto">${bottom.code}</text>
+      <text class="surf-label" x="5" y="60" text-anchor="start" dominant-baseline="middle">${left.code}</text>
+      <text class="surf-label-center" x="60" y="61" text-anchor="middle" dominant-baseline="middle" style="fill:${centerSel?'#fff':'var(--text)'};pointer-events:none;">${center.code}</text>
+    </svg>`;
+  const legend=set.map(s=>`<span class="surf-legend-item${isSel(s.code)?' sel':''}" onclick="toggleSurface('${s.code}')">${s.code} · ${s.label}</span>`).join('');
+  el.innerHTML=`<div class="surf-picker-box">
+      <div class="surf-target-wrap">${svg}</div>
+      <div>
+        <div class="surf-picker-head">ซี่ฟัน ${fdi} · ${anterior?'ฟันหน้า':'ฟันหลัง'} (คลิกส่วนของฟันเพื่อเลือกด้าน)</div>
+        <div class="surf-picker-sub">เลือกได้มากกว่า 1 ด้าน</div>
+        <div class="surf-legend-list">${legend}</div>
+      </div>
+    </div>`;
+}
+function toggleSurface(code){
+  if(selectedSurfaces.includes(code)) selectedSurfaces=selectedSurfaces.filter(c=>c!==code);
+  else selectedSurfaces.push(code);
+  renderSurfacePicker();
+}
+
+// ─── รายการหัตถการใน visit ที่กำลังสร้าง ────────────────────────────────────
+function addLineItem(){
+  if(!selProcs.length){toast('กรุณาเลือกหัตถการ');return;}
+  const price=parseFloat(document.getElementById('li-price').value)||0;
+  currentVisitItems.push({procedure:selProcs[0],tooth:selectedTooth||'',surfaces:[...selectedSurfaces],price});
+  selProcs=[]; selectedTooth=null; selectedSurfaces=[];
+  document.querySelectorAll('#proc-quick .pq-btn.sel').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('li-price').value='';
+  renderToothChart(); renderSurfacePicker(); renderLineItems();
+}
+function removeLineItem(idx){currentVisitItems.splice(idx,1);renderLineItems();}
+function renderLineItems(){
+  const body=document.getElementById('line-items-body');
+  document.getElementById('li-empty').style.display=currentVisitItems.length?'none':'block';
+  body.innerHTML=currentVisitItems.map((it,i)=>`<tr><td style="font-size:12px;">${it.procedure}</td><td style="text-align:center;font-size:12px;">${it.tooth||'-'}</td><td style="font-size:11px;">${(it.surfaces||[]).join(', ')||'-'}</td><td class="price-green">${fp(it.price)}</td><td><button class="btn-del" onclick="removeLineItem(${i})"><i class="ti ti-trash"></i></button></td></tr>`).join('');
+  updateVisitTotals();
+}
+function updateVisitTotals(){
+  const subtotal=currentVisitItems.reduce((s,it)=>s+(it.price||0),0);
+  const disc=parseFloat(document.getElementById('f-discount').value)||0;
+  document.getElementById('visit-net').textContent=fp(subtotal-disc);
+}
+
+function rds(){const sel=document.getElementById('f-dentist');const cur=sel.value;sel.innerHTML='<option value="">-- เลือกทันตแพทย์ --</option>';dentists.forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent='ทพ. '+d.fname+' '+d.lname+(d.spec?' ('+d.spec+')':'');sel.appendChild(o);});if(cur)sel.value=cur;}
+function rdl(){const el=document.getElementById('dentist-list');if(!dentists.length){el.innerHTML='<div class="empty"><i class="ti ti-user-off"></i>ยังไม่มีทันตแพทย์</div>';return;}el.innerHTML=dentists.map(d=>`<div class="dentist-row"><div class="row-inner"><div class="dentist-avatar">${d.fname[0]}${d.lname[0]}</div><div><div style="font-size:13px;font-weight:600;">ทพ. ${d.fname} ${d.lname}</div><div style="font-size:11px;color:var(--text2);">${d.license?'ใบอนุญาต: '+d.license:''}${d.license&&d.spec?' · ':''}${d.spec||''}</div></div></div><button class="btn-del" onclick="delD(${d.id})"><i class="ti ti-trash"></i></button></div>`).join('');}
+function addDentist(){const fn=document.getElementById('d-fname').value.trim(),ln=document.getElementById('d-lname').value.trim();if(!fn||!ln){toast('กรุณากรอกชื่อและนามสกุล');return;}dentists.push({id:Date.now(),fname:fn,lname:ln,license:document.getElementById('d-license').value.trim(),spec:document.getElementById('d-spec').value.trim()});sd();rdl();rds();['d-fname','d-lname','d-license','d-spec'].forEach(id=>document.getElementById(id).value='');toast('เพิ่มทันตแพทย์เรียบร้อย');}
+function delD(id){dentists=dentists.filter(d=>d.id!==id);sd();rdl();rds();}
+function gdn(id){const d=dentists.find(x=>x.id==id);return d?'ทพ. '+d.fname+' '+d.lname:'-';}
+
+function switchTab(tab){const tabs=['record','receipt','dentists','admin','dashboard','settings'];tabs.forEach(t=>{const b=document.getElementById('tab-'+t);if(b){b.classList.remove('active','b1-active','b2-active');}});const active=document.getElementById('tab-'+tab);if(active){active.classList.add('active');if(currentBranch)active.classList.add(currentBranch.cls+'-active');}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-'+tab).classList.add('active');if(tab==='receipt')renderReceiptList();if(tab==='admin')renderUserList();if(tab==='settings')loadSettings();if(tab==='dashboard'){if(!document.getElementById('dash-start').value){setDashRange('today');}else{renderDashboard();}}}
+
+function baht(n){if(!n||n===0)return'ศูนย์บาทถ้วน';const dg=['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'],ps=['','สิบ','ร้อย','พัน','หมื่น','แสน','ล้าน'];function rg(x){let s='',sn=String(parseInt(x));for(let i=0;i<sn.length;i++){let d=parseInt(sn[i]),p=sn.length-1-i;if(d===0)continue;if(p===1&&d===2)s+='ยี่';else if(p===1&&d===1)s+='';else s+=dg[d];s+=ps[p];}return s;}let ip=Math.floor(n),dp=Math.round((n-ip)*100),r='';if(ip>=1000000){r+=rg(Math.floor(ip/1000000))+'ล้าน';ip=ip%1000000;}if(ip>0)r+=rg(ip);r+='บาท';return r+(dp>0?rg(dp)+'สตางค์':'ถ้วน');}
+function fdt(d){if(!d)return'-';const ms=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];const[y,m,day]=d.split('-');return`${parseInt(day)} ${ms[parseInt(m)-1]} ${parseInt(y)+543}`;}
+function fd(d){if(!d)return'-';const[y,m,day]=d.split('-');return`${day}/${m}/${y.slice(2)}`;}
+function fmtMonthTH(ym){ const ms=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']; const[y,m]=ym.split('-'); return (ms[parseInt(m,10)-1]||m)+' '+(parseInt(y,10)+543); }
+const ORTHO_PROMO_PROC='จองโปรโมชั่นจัดฟัน';
+function fp(p){if(p===null||p===undefined||p==='')return'-';return'฿'+Number(p).toLocaleString('th-TH');}
+function fn(p){if(!p&&p!==0)return'-';return Number(p).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+// ─── ข้อมูลคนไข้/visit แบบ nested ────────────────────────────────────────────
+function flattenVisits(){
+  const out=[];
+  Object.values(patients).forEach(p=>{
+    Object.values(p.visits||{}).forEach(v=>{
+      out.push({
+        id:v.id, rNo:v.rNo, date:v.date, dn:p.dn, name:p.name, pid:p.pid,
+        age:p.age, birthdate:p.birthdate, tel:p.tel, dentistId:v.dentistId,
+        procedures:(v.items||[]).map(it=>it.procedure),
+        price:v.total, discount:v.discount, payment:v.payment, note:v.note, by:v.by,
+        items:v.items, patientId:p.id, visitId:v.id
+      });
+    });
+  });
+  return out.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||String(b.id).localeCompare(String(a.id)));
+}
+function findOrCreatePatient(dn,name,pid,tel){
+  let p = dn ? Object.values(patients).find(x=>x.dn===dn)
+             : Object.values(patients).find(x=>x.name.trim().toLowerCase()===name.trim().toLowerCase()&&x.pid===pid&&x.tel===tel);
+  const birthdate=document.getElementById('f-birthdate').value;
+  const age=document.getElementById('f-age').value;
+  if(!p){
+    const id='p_'+Date.now();
+    p={id,dn,name,pid,birthdate:birthdate||'',age,tel,createdAt:Date.now(),createdBy:currentUser?currentUser.username:'',visits:{}};
+    patients[id]=p;
+  } else {
+    p.name=name; if(pid)p.pid=pid; if(tel)p.tel=tel;
+    if(birthdate)p.birthdate=birthdate;
+    if(age)p.age=age;
+  }
+  return p;
+}
+function findVisitById(visitId){
+  for(const p of Object.values(patients)){
+    if(p.visits&&p.visits[visitId]) return {patient:p, visit:p.visits[visitId]};
+  }
+  return null;
+}
+
+function addVisit(){const name=document.getElementById('f-name').value.trim();if(!name){toast('กรุณากรอกชื่อคนไข้');return;}if(!document.getElementById('f-dentist').value){toast('กรุณาเลือกทันตแพทย์');return;}if(!currentVisitItems.length){toast('กรุณาเพิ่มรายการหัตถการอย่างน้อย 1 รายการ');return;}
+  const subtotal=currentVisitItems.reduce((s,it)=>s+(it.price||0),0);
+  const discount=parseFloat(document.getElementById('f-discount').value)||0;
+  const dn=document.getElementById('f-dn').value.trim();
+  const pid=document.getElementById('f-pid').value.trim();
+  const tel=document.getElementById('f-tel').value.trim();
+  const patient=findOrCreatePatient(dn,name,pid,tel);
+  const rnoInput=document.getElementById('f-receiptno').value.trim();
+  const rNoVal=rnoInput!==''?rnoInput:rCnt++;
+  const visitId='v_'+Date.now();
+  patient.visits[visitId]={
+    id:visitId, rNo:rNoVal, date:document.getElementById('f-date').value||today,
+    dentistId:parseInt(document.getElementById('f-dentist').value),
+    dentition:chartMode,
+    items:currentVisitItems.map(it=>({...it})),
+    discount, subtotal, total:subtotal-discount,
+    payment:document.getElementById('f-payment').value,
+    note:document.getElementById('f-note').value.trim(),
+    by:currentUser?currentUser.username:''
+  };
+  sp();renderTable();updateStats();clearForm();toast('บันทึกเรียบร้อย');}
+function clearForm(){['f-dn','f-receiptno','f-name','f-pid','f-age','f-birthdate','f-tel','li-price','f-discount','f-note'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-date').value=today;document.getElementById('f-dentist').value='';document.getElementById('f-payment').value='cash';selProcs=[];currentVisitItems=[];document.querySelectorAll('.pq-btn').forEach(b=>b.classList.remove('sel'));setChartMode('adult');renderLineItems();}
+function deleteVisit(visitId){if(currentUser&&currentUser.role!=='admin'){toast('เฉพาะ Admin เท่านั้นที่ลบได้');return;}const found=findVisitById(visitId);if(!found)return;delete found.patient.visits[visitId];if(!Object.keys(found.patient.visits).length)delete patients[found.patient.id];sp();renderTable();updateStats();toast('ลบแล้ว');}
+
+function renderTable(){const q=document.getElementById('search-input').value.toLowerCase();const f=flattenVisits().filter(r=>r.name.toLowerCase().includes(q)||(r.dn&&r.dn.toLowerCase().includes(q)));const isAdmin=currentUser&&currentUser.role==='admin';document.getElementById('empty-state').style.display=f.length?'none':'block';document.getElementById('table-body').innerHTML=f.map(r=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(r.date)}</td><td style="color:var(--text2);font-size:11px;">${r.dn||'-'}</td><td style="font-weight:600;font-size:12px;">${r.name}</td><td style="color:var(--text2);font-size:11px;">${r.age?r.age+'ปี':'-'}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(r.dentistId)}</span></td><td><div class="chips">${r.procedures.map(p=>`<span class="badge ${gpc(p)}">${p}</span>`).join('')}</div></td><td class="price-green">${fp(r.price)}</td><td style="white-space:nowrap;"><button class="btn-sm-teal" onclick="openReceipt('${r.id}')"><i class="ti ti-receipt" style="font-size:12px;"></i>ใบเสร็จ</button>${isAdmin?`<button class="btn-del" onclick="deleteVisit('${r.id}')" style="margin-left:2px;"><i class="ti ti-trash"></i></button>`:''}</td></tr>`).join('');}
+function renderReceiptList(){const q=document.getElementById('receipt-search').value.toLowerCase();const f=flattenVisits().filter(r=>r.name.toLowerCase().includes(q)||(r.dn&&r.dn.toLowerCase().includes(q)));document.getElementById('receipt-empty').style.display=f.length?'none':'block';document.getElementById('receipt-table-body').innerHTML=f.map(r=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(r.date)}</td><td style="color:var(--text2);font-size:11px;">${r.dn||'-'}</td><td style="font-weight:600;font-size:12px;">${r.name}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(r.dentistId)}</span></td><td><div class="chips">${r.procedures.map(p=>`<span class="badge ${gpc(p)}">${p}</span>`).join('')}</div></td><td class="price-green">${fp(r.price)}</td><td><button class="btn-sm-teal" onclick="openReceipt('${r.id}')"><i class="ti ti-receipt" style="font-size:12px;"></i>ออกใบเสร็จ</button></td></tr>`).join('');}
+
+function openReceipt(id){const r=flattenVisits().find(x=>x.id===id);if(!r)return;currentReceiptId=id;document.getElementById('btn-edit-rno').classList.toggle('hidden',!(currentUser&&currentUser.role==='admin'));document.getElementById('r-branch-line').textContent=currentBranch?currentBranch.name+' ('+currentBranch.nameEn+')'+(clinic.tel?' โทร. '+clinic.tel:''):'';document.getElementById('r-book').textContent=clinic.bookNo||'0009';document.getElementById('r-no').textContent=String(r.rNo!==undefined&&r.rNo!==null?r.rNo:r.id).padStart(4,'0');document.getElementById('r-name').textContent=r.name;document.getElementById('r-dn').textContent=r.dn||'-';document.getElementById('r-pid').textContent=r.pid||'-';document.getElementById('r-age').textContent=r.age?r.age+' ปี':'-';document.getElementById('r-date').textContent=fdt(r.date);document.getElementById('r-dentist').textContent=gdn(r.dentistId);document.getElementById('r-cashier').textContent=currentUser?currentUser.name:'';document.getElementById('r-payer').textContent=r.name;
+  const items=r.items||[];const disc=r.discount||0;const subtotal=items.reduce((s,it)=>s+(it.price||0),0);
+  let rows='';
+  items.forEach((it,i)=>{
+    const toothLabel=it.tooth?(' — ซี่ '+it.tooth+((it.surfaces&&it.surfaces.length)?' ('+it.surfaces.join(',')+')':'')):'';
+    rows+=`<tr><td class="tno">${i+1}</td><td>${it.procedure}${toothLabel}${r.note&&i===0?' ('+r.note+')':''}</td><td class="tqty">1</td><td class="tprice">${fn(it.price)}</td><td class="tdisc">-</td><td class="ttotal">${fn(it.price)}</td></tr>`;
+  });
+  for(let i=items.length;i<8;i++)rows+=`<tr class="erow"><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+  document.getElementById('r-items').innerHTML=rows;
+  const net=subtotal-disc;
+  document.getElementById('r-sub').textContent=subtotal?fn(subtotal)+' บาท':'-';
+  document.getElementById('r-disc').textContent=disc?fn(disc)+' บาท':'- บาท';
+  document.getElementById('r-total').textContent=fn(net)+' บาท';
+  document.getElementById('r-baht-text').textContent=baht(net);
+  const pm=r.payment||'cash';['c-cash','c-transfer','c-card','c-sso'].forEach(id=>document.getElementById(id).classList.remove('checked'));document.getElementById('c-'+pm).classList.add('checked');document.getElementById('pay-cash-a').textContent=pm==='cash'&&subtotal?fn(net):'';document.getElementById('pay-transfer-a').textContent=pm==='transfer'&&subtotal?fn(net):'';document.getElementById('pay-card-a').textContent=pm==='card'&&subtotal?fn(net):'';document.getElementById('pay-sso-a').textContent=pm==='sso'&&subtotal?fn(net):'';document.getElementById('receipt-preview-wrap').style.display='block';if(!document.getElementById('page-receipt').classList.contains('active'))switchTab('receipt');setTimeout(()=>document.getElementById('receipt-preview-wrap').scrollIntoView({behavior:'smooth',block:'start'}),100);}
+
+function editReceiptNo(){
+  if(!(currentUser&&currentUser.role==='admin')){toast('เฉพาะ Admin เท่านั้นที่แก้ไขได้');return;}
+  const found=findVisitById(currentReceiptId);if(!found)return;
+  const cur=(found.visit.rNo!==undefined&&found.visit.rNo!==null)?String(found.visit.rNo):'';
+  const val=prompt('แก้ไขเลขที่ใบเสร็จ:',cur);
+  if(val===null)return;
+  const trimmed=val.trim();
+  if(trimmed===''){toast('กรุณากรอกเลขที่ใบเสร็จ');return;}
+  found.visit.rNo=trimmed;
+  sp();
+  document.getElementById('r-no').textContent=String(trimmed).padStart(4,'0');
+  renderTable();renderReceiptList();
+  toast('แก้ไขเลขที่ใบเสร็จเรียบร้อย');
+}
+function closeReceipt(){document.getElementById('receipt-preview-wrap').style.display='none';}
+
+function printReceipt(){const content=document.getElementById('receipt-doc').outerHTML;const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>ใบเสร็จ - วอทเดอะทูธ</title><style>@page{size:A5 portrait;margin:8mm;}*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Sarabun','TH Sarabun New','Angsana New',sans-serif;font-size:12px;background:#fff;color:#000;}#receipt-doc{width:100%;border:1.5px solid #7B68AB;}.r-hdr{display:flex;align-items:flex-start;padding:8px 12px;border-bottom:2px solid #7B68AB;gap:10px;}.r-logo-area{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:80px;}.r-cinfo{flex:1;text-align:right;}.r-cname-th{font-size:14px;font-weight:800;color:#5B3A8A;line-height:1.3;}.r-cname-en{font-size:12px;font-weight:700;color:#5B3A8A;}.r-caddr{font-size:10px;color:#333;margin-top:2px;line-height:1.6;}.r-infobar{background:#7B68AB;color:#fff;display:grid;grid-template-columns:2fr 0.6fr 0.9fr 1.2fr;}.r-ic{padding:5px 8px;border-right:1px solid rgba(255,255,255,0.2);}.r-ic:last-child{border-right:none;position:relative;}.r-il{font-size:9px;opacity:0.85;margin-bottom:1px;}.r-iv{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.r-stamp{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#5B3A8A;color:#fff;border:2px solid #fff;border-radius:4px;padding:3px 7px;font-size:10px;font-weight:800;text-align:center;line-height:1.4;}.r-patient{display:grid;grid-template-columns:1.2fr 0.8fr;border-bottom:1px solid #bbb;}.r-pc{padding:5px 10px;}.r-pc:first-child{border-right:1px solid #bbb;}.r-pf{display:flex;align-items:baseline;gap:3px;margin-bottom:3px;font-size:11.5px;}.r-pl{color:#555;white-space:nowrap;min-width:66px;font-size:11px;}.r-pv{font-weight:700;border-bottom:1px solid #aaa;flex:1;padding-bottom:1px;font-size:11.5px;}.r-table{width:100%;border-collapse:collapse;font-size:11.5px;}.r-table th{background:#EDE7F6;border:1px solid #9B8EC4;padding:4px 6px;text-align:center;font-weight:700;font-size:11px;color:#3a1a6a;}.r-table td{border:1px solid #ccc;padding:3px 6px;}.tno{text-align:center;width:26px;}.tqty{text-align:center;width:42px;}.tprice{text-align:right;width:72px;}.tdisc{text-align:right;width:62px;}.ttotal{text-align:right;width:78px;font-weight:700;}.erow td{height:18px;}.r-baht{padding:4px 12px;font-size:11px;color:#3a1a6a;font-style:italic;border-bottom:1px solid #bbb;background:#faf8ff;}.r-bottom{display:flex;font-size:11.5px;}.r-paycol{flex:1;padding:7px 10px;border-right:1.5px solid #bbb;}.r-paytitle{font-weight:700;font-size:11px;color:#5B3A8A;margin-bottom:5px;text-transform:uppercase;}.r-payopt{display:flex;align-items:center;gap:5px;margin-bottom:5px;font-size:11.5px;}.r-circle{width:13px;height:13px;border:1.5px solid #666;border-radius:50%;flex-shrink:0;display:inline-block;}.r-circle.checked{border-color:#5B3A8A;background:#5B3A8A;}.r-payline{border-bottom:1px dotted #aaa;flex:1;margin:0 4px;}.r-payamt{min-width:52px;text-align:right;font-weight:700;font-size:11.5px;}.r-sumcol{width:200px;flex-shrink:0;display:flex;flex-direction:column;}.r-sumrow{display:flex;border-bottom:1px solid #ddd;font-size:11.5px;}.r-sumrow:last-child{border-bottom:none;}.r-sumlbl{flex:1;padding:4px 8px;color:#444;border-right:1px solid #ddd;font-size:11px;display:flex;align-items:center;}.r-sumval-wrap{display:flex;}.r-sumval{width:70px;padding:4px 6px;text-align:right;font-weight:600;border-right:1px solid #ddd;font-size:11.5px;}.r-sumval:last-child{border-right:none;}.r-grandrow{background:#5B3A8A;color:#fff;font-weight:700;font-size:12px;display:flex;}.r-grandrow .r-sumlbl{color:#fff;border-right-color:rgba(255,255,255,0.3);}.r-grandrow .r-sumval{color:#fff;border-right-color:rgba(255,255,255,0.3);}.r-sig{display:flex;border-top:1px solid #bbb;font-size:12px;text-align:center;}.r-sigbox{flex:1;padding:8px 10px 10px;border-right:1px solid #bbb;display:flex;flex-direction:column;align-items:center;gap:2px;}.r-sigbox:last-child{border-right:none;}.r-sigline{border-bottom:1px solid #999;width:80%;margin:16px auto 4px;}.r-siglbl{color:#666;font-size:11.5px;}.r-signame{font-weight:700;font-size:11px;}.r-wm{display:none;}@media print{body{padding:0;}#receipt-doc{border:none;width:100%;}}</style>
+</head><body>${content}</body></html>`);w.document.close();setTimeout(()=>{w.focus();w.print();},500);}
+
+function updateStats(){const all=flattenVisits();document.getElementById('s-total').textContent=all.length;document.getElementById('s-today').textContent=all.filter(r=>r.date===today).length;document.getElementById('s-proc').textContent=all.reduce((s,r)=>s+r.procedures.length,0);document.getElementById('s-rev').textContent='฿'+all.reduce((s,r)=>s+(r.price||0),0).toLocaleString('th-TH');}
+function addUser(){const u=document.getElementById('nu-user').value.trim(),p=document.getElementById('nu-pass').value.trim();if(!u||!p){toast('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');return;}if(users.find(x=>x.username===u)){toast('ชื่อผู้ใช้นี้มีอยู่แล้ว');return;}users.push({id:Date.now(),username:u,password:p,name:document.getElementById('nu-name').value.trim()||u,role:document.getElementById('nu-role').value});su();renderUserList();['nu-user','nu-pass','nu-name'].forEach(id=>document.getElementById(id).value='');toast('เพิ่มผู้ใช้เรียบร้อย');}
+function delUser(id){if(currentUser&&currentUser.id===id){toast('ไม่สามารถลบบัญชีตัวเองได้');return;}users=users.filter(u=>u.id!==id);su();renderUserList();}
+function renderUserList(){const el=document.getElementById('user-list');if(!users.length){el.innerHTML='<div class="empty"><i class="ti ti-user-off"></i>ไม่มีผู้ใช้</div>';return;}el.innerHTML=users.map(u=>`<div class="u-row"><div class="row-inner"><div class="u-av ${u.role==='staff'?'staff':''}">${(u.name||u.username).slice(0,2).toUpperCase()}</div><div><div style="font-size:13px;font-weight:600;">${u.name||u.username} <span class="badge ${u.role==='admin'?'bp':'bt'}" style="margin-left:4px;">${u.role==='admin'?'Admin':'Staff'}</span></div><div style="font-size:11px;color:var(--text2);">@${u.username}</div></div></div><div style="display:flex;gap:4px;align-items:center;"><button class="btn-del" onclick="changePassword(${u.id})" title="เปลี่ยนรหัสผ่าน" style="color:var(--purple);"><i class="ti ti-key"></i></button>${u.id!==1?`<button class="btn-del" onclick="delUser(${u.id})"><i class="ti ti-trash"></i></button>`:'<span style="font-size:11px;color:var(--text3);">ค่าเริ่มต้น</span>'}</div></div>`).join('');}
+function changePassword(id){
+  const u=users.find(x=>x.id===id);if(!u)return;
+  const p1=prompt('ตั้งรหัสผ่านใหม่สำหรับ @'+u.username+' :');
+  if(p1===null)return;
+  if(!p1.trim()){toast('กรุณากรอกรหัสผ่าน');return;}
+  const p2=prompt('กรอกรหัสผ่านใหม่อีกครั้งเพื่อยืนยัน:');
+  if(p2===null)return;
+  if(p1.trim()!==p2.trim()){toast('รหัสผ่านไม่ตรงกัน กรุณาทำใหม่');return;}
+  u.password=p1.trim();su();toast('เปลี่ยนรหัสผ่านเรียบร้อย');
+}
+
+function setDashRange(mode){
+  const d=new Date();
+  if(mode==='today'){
+    document.getElementById('dash-start').value=today;
+    document.getElementById('dash-end').value=today;
+  }else if(mode==='month'){
+    const first=new Date(d.getFullYear(),d.getMonth(),1).toISOString().split('T')[0];
+    document.getElementById('dash-start').value=first;
+    document.getElementById('dash-end').value=today;
+  }
+  renderDashboard();
+}
+function renderDashboard(){
+  if(!(currentUser&&currentUser.role==='admin'))return;
+  const start=document.getElementById('dash-start').value;
+  const end=document.getElementById('dash-end').value;
+  const f=flattenVisits().filter(r=>{
+    if(start&&r.date<start)return false;
+    if(end&&r.date>end)return false;
+    return true;
+  });
+  const pIds=new Set(f.map(r=>r.patientId||r.id));
+  document.getElementById('dash-total-patients').textContent=pIds.size;
+  document.getElementById('dash-total-procs').textContent=f.reduce((s,r)=>s+((r.procedures||r.items||[]).length),0);
+  document.getElementById('dash-total-rev').textContent='฿'+f.reduce((s,r)=>s+(r.price||r.total||0),0).toLocaleString('th-TH');
+  const byDayDoc={};
+  f.forEach(r=>{
+    const key=r.date+'|'+r.dentistId;
+    if(!byDayDoc[key])byDayDoc[key]={date:r.date,dentistId:r.dentistId,pIds:new Set(),procs:0,rev:0};
+    byDayDoc[key].pIds.add(r.patientId||r.id);
+    byDayDoc[key].procs+=(r.procedures||r.items||[]).length;
+    byDayDoc[key].rev+=(r.price||r.total||0);
+  });
+  const rows=Object.values(byDayDoc).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0);
+  document.getElementById('dash-empty').style.display=rows.length?'none':'block';
+  document.getElementById('dash-table-body').innerHTML=rows.map(x=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(x.date)}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(x.dentistId)}</span></td><td>${x.pIds.size}</td><td>${x.procs}</td><td class="price-green">${fp(x.rev)}</td></tr>`).join('');
+  const byDoc={};
+  f.forEach(r=>{
+    const key=r.dentistId;
+    if(!byDoc[key])byDoc[key]={dentistId:r.dentistId,pIds:new Set(),procs:0,rev:0};
+    byDoc[key].pIds.add(r.patientId||r.id);
+    byDoc[key].procs+=(r.procedures||r.items||[]).length;
+    byDoc[key].rev+=(r.price||r.total||0);
+  });
+  const sumRows=Object.values(byDoc).sort((a,b)=>b.rev-a.rev);
+  document.getElementById('dash-summary-empty').style.display=sumRows.length?'none':'block';
+  document.getElementById('dash-summary-body').innerHTML=sumRows.map(x=>`<tr><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(x.dentistId)}</span></td><td>${x.pIds.size}</td><td>${x.procs}</td><td class="price-green">${fp(x.rev)}</td></tr>`).join('');
+
+  // ─── สรุปยอดตามวิธีชำระเงิน ───────────────────────────────────────────────
+  const payTotals={cash:0,transfer:0,card:0,sso:0};
+  const payCounts={cash:0,transfer:0,card:0,sso:0};
+  f.forEach(r=>{
+    const k=r.payment||'cash';
+    if(payTotals[k]===undefined)return;
+    payTotals[k]+=(r.price||r.total||0);
+    payCounts[k]+=1;
+  });
+  ['cash','transfer','card','sso'].forEach(k=>{
+    document.getElementById('dash-pay-'+k).textContent=fp(payTotals[k]);
+    document.getElementById('dash-pay-'+k+'-cnt').textContent=payCounts[k]+' ครั้ง';
+  });
+
+  // ─── คนไข้จองโปรโมชั่นจัดฟันใหม่ แยกตามเดือน ─────────────────────────────
+  const orthoByMonth={};
+  f.forEach(r=>{
+    if(!(r.procedures||[]).includes(ORTHO_PROMO_PROC))return;
+    const month=(r.date||'').slice(0,7);
+    if(!month)return;
+    if(!orthoByMonth[month])orthoByMonth[month]={month,patients:new Map()};
+    orthoByMonth[month].patients.set(r.patientId||r.id, r.name);
+  });
+  const orthoRows=Object.values(orthoByMonth).sort((a,b)=>b.month.localeCompare(a.month));
+  document.getElementById('dash-ortho-empty').style.display=orthoRows.length?'none':'block';
+  document.getElementById('dash-ortho-body').innerHTML=orthoRows.map(x=>{
+    const names=[...x.patients.values()];
+    return `<tr><td style="font-weight:600;">${fmtMonthTH(x.month)}</td><td class="price-green" style="font-weight:700;">${x.patients.size} คน</td><td style="font-size:11px;">${names.join(', ')||'-'}</td></tr>`;
+  }).join('');
+}
+
+let toastTimer;
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);}
+
+
+</script>
 </body>
 </html>
