@@ -383,6 +383,8 @@ tr:hover td { background: var(--bg); }
           </div>
           <div class="grid2">
             <div class="field"><label>ราคารายการนี้ (บาท)</label><div class="price-wrap"><span class="baht">฿</span><input type="number" id="li-price" placeholder="0" min="0"></div></div>
+            <div class="field"><label>ส่วนลดรายการนี้ (฿)</label><div class="price-wrap"><span class="baht">฿</span><input type="number" id="li-discount" placeholder="0" min="0"></div></div>
+            <div class="field full"><label>วิธีชำระรายการนี้</label><select id="li-payment" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text);font-family:inherit;"><option value="cash">💵 เงินสด</option><option value="transfer">🏦 โอนเงิน</option><option value="card">💳 บัตรเครดิต</option><option value="sso">🏥 ประกันสังคม</option></select></div>
             <div class="field" style="justify-content:flex-end;">
               <button type="button" class="btn-green" onclick="addLineItem()" style="width:100%;justify-content:center;"><i class="ti ti-plus" style="font-size:15px;"></i>เพิ่มรายการ</button>
             </div>
@@ -390,7 +392,7 @@ tr:hover td { background: var(--bg); }
           <div class="field full">
             <label>รายการหัตถการที่เพิ่มแล้ว</label>
             <div class="scroll-x">
-              <table class="li-table"><thead><tr><th>หัตถการ</th><th style="width:70px;">ซี่ฟัน</th><th style="width:130px;">ด้าน</th><th style="width:90px;">ราคา</th><th style="width:40px;"></th></tr></thead>
+              <table class="li-table"><thead><tr><th>หัตถการ</th><th style="width:55px;">ซี่ฟัน</th><th style="width:72px;">ราคา</th><th style="width:65px;">ส่วนลด</th><th style="width:68px;">สุทธิ</th><th style="width:80px;">ชำระ</th><th style="width:36px;"></th></tr></thead>
                 <tbody id="line-items-body"></tbody></table>
             </div>
             <div class="empty" id="li-empty" style="padding:1rem;">ยังไม่มีรายการ</div>
@@ -398,9 +400,7 @@ tr:hover td { background: var(--bg); }
         </div>
 
         <div class="grid2">
-          <div class="field"><label>ส่วนลดรวม (บาท)</label><div class="price-wrap"><span class="baht">฿</span><input type="number" id="f-discount" placeholder="0" min="0" oninput="updateVisitTotals()"></div></div>
           <div class="field"><label>ยอดสุทธิ</label><div class="stat-val" id="visit-net" style="font-size:20px;">฿0</div></div>
-          <div class="field"><label>วิธีชำระเงิน</label><select id="f-payment"><option value="cash">เงินสด</option><option value="transfer">โอนเงิน</option><option value="card">บัตรเครดิต</option><option value="sso">ประกันสังคม</option></select></div>
           <div class="field"><label>หมายเหตุ</label><input type="text" id="f-note" placeholder="หมายเหตุเพิ่มเติม..."></div>
         </div>
         <div class="row-btns">
@@ -1397,24 +1397,36 @@ function toggleSurface(code){
 function addLineItem(){
   if(!selProcs.length){toast('กรุณาเลือกหัตถการ');return;}
   const price=parseFloat(document.getElementById('li-price').value)||0;
-  currentVisitItems.push({procedure:selProcs[0],tooth:selectedTooth||'',surfaces:[...selectedSurfaces],price});
+  const discount=parseFloat(document.getElementById('li-discount')?.value)||0;
+  const payment=document.getElementById('li-payment')?.value||'cash';
+  currentVisitItems.push({procedure:selProcs[0],tooth:selectedTooth||'',surfaces:[...selectedSurfaces],price,discount,payment});
   selProcs=[]; selectedTooth=null; selectedSurfaces=[];
   document.querySelectorAll('#proc-quick .pq-btn.sel').forEach(b=>b.classList.remove('sel'));
   document.getElementById('li-price').value='';
+  const _d=document.getElementById('li-discount');if(_d)_d.value='';
+  const _p=document.getElementById('li-payment');if(_p)_p.value='cash';
   renderToothChart(); renderSurfacePicker(); renderLineItems();
 }
 function removeLineItem(idx){currentVisitItems.splice(idx,1);renderLineItems();}
+const PAY_LBL={'cash':'💵 สด','transfer':'🏦 โอน','card':'💳 บัตร','sso':'🏥 ประกัน'};
 function renderLineItems(){
   const body=document.getElementById('line-items-body');
   document.getElementById('li-empty').style.display=currentVisitItems.length?'none':'block';
-  body.innerHTML=currentVisitItems.map((it,i)=>`<tr><td style="font-size:12px;">${it.procedure}</td><td style="text-align:center;font-size:12px;">${it.tooth||'-'}</td><td style="font-size:11px;">${(it.surfaces||[]).join(', ')||'-'}</td><td class="price-green">${fp(it.price)}</td><td><button class="btn-del" onclick="removeLineItem(${i})"><i class="ti ti-trash"></i></button></td></tr>`).join('');
+  body.innerHTML=currentVisitItems.map((it,i)=>{
+    const disc=it.discount||0;
+    const net=Math.max(0,(it.price||0)-disc);
+    return `<tr>
+      <td style="font-size:12px;">${it.procedure}${it.tooth?` <small style="color:var(--purple)">(${it.tooth})</small>`:''}</td>
+      <td style="text-align:right;font-size:12px;">${fp(it.price)}</td>
+      <td style="text-align:right;font-size:12px;color:var(--red);">${disc>0?'-'+fp(disc):'-'}</td>
+      <td style="text-align:right;font-size:12px;font-weight:700;">${fp(net)}</td>
+      <td style="font-size:11px;white-space:nowrap;">${PAY_LBL[it.payment||'cash']||'สด'}</td>
+      <td><button class="btn-del" onclick="removeLineItem(${i})"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('');
   updateVisitTotals();
 }
-function updateVisitTotals(){
-  const subtotal=currentVisitItems.reduce((s,it)=>s+(it.price||0),0);
-  const disc=parseFloat(document.getElementById('f-discount').value)||0;
-  document.getElementById('visit-net').textContent=fp(subtotal-disc);
-}
+function updateVisitTotals(){const net=currentVisitItems.reduce((s,it)=>s+Math.max(0,(it.price||0)-(it.discount||0)),0);const el=document.getElementById('visit-net');if(el)el.textContent=fp(net);}
 
 function rds(){const sel=document.getElementById('f-dentist');const cur=sel.value;sel.innerHTML='<option value="">-- เลือกทันตแพทย์ --</option>';dentists.forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent='ทพ. '+d.fname+' '+d.lname+(d.spec?' ('+d.spec+')':'');sel.appendChild(o);});if(cur)sel.value=cur;}
 function rdl(){const el=document.getElementById('dentist-list');if(!dentists.length){el.innerHTML='<div class="empty"><i class="ti ti-user-off"></i>ยังไม่มีทันตแพทย์</div>';return;}el.innerHTML=dentists.map(d=>`<div class="dentist-row"><div class="row-inner"><div class="dentist-avatar">${d.fname[0]}${d.lname[0]}</div><div><div style="font-size:13px;font-weight:600;">ทพ. ${d.fname} ${d.lname}</div><div style="font-size:11px;color:var(--text2);">${d.license?'ใบอนุญาต: '+d.license:''}${d.license&&d.spec?' · ':''}${d.spec||''}</div></div></div><button class="btn-del" onclick="delD(${d.id})"><i class="ti ti-trash"></i></button></div>`).join('');}
@@ -1486,13 +1498,13 @@ function addVisit(){const name=document.getElementById('f-name').value.trim();if
     dentistId:parseInt(document.getElementById('f-dentist').value),
     dentition:chartMode,
     items:currentVisitItems.map(it=>({...it})),
-    discount, subtotal, total:subtotal-discount,
-    payment:document.getElementById('f-payment').value,
+    discount, subtotal, total:currentVisitItems.reduce((s,it)=>s+Math.max(0,(it.price||0)-(it.discount||0)),0),
+    payment:(currentVisitItems[0]||{}).payment||'cash',
     note:document.getElementById('f-note').value.trim(),
     by:currentUser?currentUser.username:''
   };
   sp();renderTable();updateStats();clearForm();toast('บันทึกเรียบร้อย');}
-function clearForm(){['f-dn','f-receiptno','f-name','f-pid','f-age','f-birthdate','f-tel','li-price','f-discount','f-note'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-date').value=today;document.getElementById('f-dentist').value='';document.getElementById('f-payment').value='cash';selProcs=[];currentVisitItems=[];document.querySelectorAll('.pq-btn').forEach(b=>b.classList.remove('sel'));setChartMode('adult');renderLineItems();}
+function clearForm(){['f-dn','f-receiptno','f-name','f-pid','f-age','f-birthdate','f-tel','li-price','f-note'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-date').value=today;document.getElementById('f-dentist').value='';const __p=document.getElementById('li-payment');if(__p)__p.value='cash';const __d=document.getElementById('li-discount');if(__d)__d.value='';selProcs=[];currentVisitItems=[];document.querySelectorAll('.pq-btn').forEach(b=>b.classList.remove('sel'));setChartMode('adult');renderLineItems();}
 function deleteVisit(visitId){if(currentUser&&currentUser.role!=='admin'){toast('เฉพาะ Admin เท่านั้นที่ลบได้');return;}const found=findVisitById(visitId);if(!found)return;delete found.patient.visits[visitId];if(!Object.keys(found.patient.visits).length)delete patients[found.patient.id];sp();renderTable();updateStats();toast('ลบแล้ว');}
 
 function renderTable(){const q=document.getElementById('search-input').value.toLowerCase();const f=flattenVisits().filter(r=>r.name.toLowerCase().includes(q)||(r.dn&&r.dn.toLowerCase().includes(q)));const isAdmin=currentUser&&currentUser.role==='admin';document.getElementById('empty-state').style.display=f.length?'none':'block';document.getElementById('table-body').innerHTML=f.map(r=>`<tr><td style="font-size:11px;color:var(--text2);">${fd(r.date)}</td><td style="color:var(--text2);font-size:11px;">${r.dn||'-'}</td><td style="font-weight:600;font-size:12px;">${r.name}</td><td style="color:var(--text2);font-size:11px;">${r.age?r.age+'ปี':'-'}</td><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(r.dentistId)}</span></td><td><div class="chips">${r.procedures.map(p=>`<span class="badge ${gpc(p)}">${p}</span>`).join('')}</div></td><td class="price-green">${fp(r.price)}</td><td style="white-space:nowrap;"><button class="btn-sm-teal" onclick="openReceipt('${r.id}')"><i class="ti ti-receipt" style="font-size:12px;"></i>ใบเสร็จ</button>${isAdmin?`<button class="btn-del" onclick="deleteVisit('${r.id}')" style="margin-left:2px;"><i class="ti ti-trash"></i></button>`:''}</td></tr>`).join('');}
