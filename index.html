@@ -985,9 +985,9 @@ const BRANCHES = {
 };
 
 const PROC_GROUPS=[
-  {label:'🦷 ทันตกรรมทั่วไป',cls:'',items:['ขูดหินปูน','อุดฟัน','ถอนฟัน','ผ่าฟันคุด','เกลารากฟัน']},
+  {label:'🦷 ทันตกรรมทั่วไป',cls:'',items:['ขูดหินปูน','อุดฟัน','ถอนฟัน','ผ่าฟันคุด','เกลารากฟัน','รักษาคลองรากฟัน','เฝือกสบฟัน']},
   {label:'👑 ทันตกรรมบูรณะ',cls:'',items:['รากเทียม','ครอบฟัน','สะพานฟัน','ฟันปลอมฐานพลาสติก','ฟันปลอมฐานโลหะ','ฟันปลอมทั้งปาก']},
-  {label:'🔧 จัดฟัน',cls:'ortho',items:['ปรับเครื่องมือจัดฟัน','ติดอุปกรณ์หลุด','ติดอุปกรณ์จัดฟันบน','ติดอุปกรณ์จัดฟันล่าง','จองโปรโมชั่นจัดฟัน']},
+  {label:'🔧 จัดฟัน',cls:'ortho',items:['ปรับเครื่องมือจัดฟัน','ติดอุปกรณ์หลุด','ติดอุปกรณ์จัดฟันบน','ติดอุปกรณ์จัดฟันล่าง','ถอดเครื่องมือจัดฟัน','ทำรีเทนเนอร์','จองโปรโมชั่นจัดฟัน']},
   {label:'📷 เอกซเรย์',cls:'xray',items:['ถ่ายเอกซเรย์ฟิล์มเล็ก','ถ่ายเอกซเรย์ฟิล์มใหญ่']}
 ];
 const ALL_PROCS=PROC_GROUPS.flatMap(g=>g.items);
@@ -1524,7 +1524,16 @@ function openReceipt(id){const r=flattenVisits().find(x=>x.id===id);if(!r)return
   document.getElementById('r-disc').textContent=disc?fn(disc)+' บาท':'- บาท';
   document.getElementById('r-total').textContent=fn(net)+' บาท';
   document.getElementById('r-baht-text').textContent=baht(net);
-  const pm=r.payment||'cash';['c-cash','c-transfer','c-card','c-sso'].forEach(id=>document.getElementById(id).classList.remove('checked'));document.getElementById('c-'+pm).classList.add('checked');document.getElementById('pay-cash-a').textContent=pm==='cash'&&subtotal?fn(net):'';document.getElementById('pay-transfer-a').textContent=pm==='transfer'&&subtotal?fn(net):'';document.getElementById('pay-card-a').textContent=pm==='card'&&subtotal?fn(net):'';document.getElementById('pay-sso-a').textContent=pm==='sso'&&subtotal?fn(net):'';document.getElementById('receipt-preview-wrap').style.display='block';if(!document.getElementById('page-receipt').classList.contains('active'))switchTab('receipt');setTimeout(()=>document.getElementById('receipt-preview-wrap').scrollIntoView({behavior:'smooth',block:'start'}),100);}
+  // คำนวณยอดแยกตามวิธีชำระจาก items
+  const payTotals={cash:0,transfer:0,card:0,sso:0};
+  (r.items||[]).forEach(it=>{const k=it.payment||'cash';const net=Math.max(0,(it.price||0)-(it.discount||0));payTotals[k]=(payTotals[k]||0)+net;});
+  ['cash','transfer','card','sso'].forEach(k=>{
+    const circle=document.getElementById('c-'+k);
+    const amtEl=document.getElementById('pay-'+k+'-a');
+    if(circle) circle.classList.toggle('checked', payTotals[k]>0);
+    if(amtEl) amtEl.textContent=payTotals[k]>0?fn(payTotals[k]):'';
+  });
+  document.getElementById('receipt-preview-wrap').style.display='block';if(!document.getElementById('page-receipt').classList.contains('active'))switchTab('receipt');setTimeout(()=>document.getElementById('receipt-preview-wrap').scrollIntoView({behavior:'smooth',block:'start'}),100);}
 
 function editReceiptNo(){
   if(!(currentUser&&currentUser.role==='admin')){toast('เฉพาะ Admin เท่านั้นที่แก้ไขได้');return;}
@@ -1626,14 +1635,24 @@ function renderDashboard(){
   document.getElementById('dash-summary-empty').style.display=sumRows.length?'none':'block';
   document.getElementById('dash-summary-body').innerHTML=sumRows.map(x=>`<tr><td><span class="dentist-chip"><i class="ti ti-user-circle" style="font-size:11px;"></i>${gdn(x.dentistId)}</span></td><td>${x.pIds.size}</td><td>${x.procs}</td><td class="price-green">${fp(x.rev)}</td></tr>`).join('');
 
-  // ─── สรุปยอดตามวิธีชำระเงิน ───────────────────────────────────────────────
+  // ─── สรุปยอดตามวิธีชำระเงิน (คำนวณจาก items) ───────────────────────────────
   const payTotals={cash:0,transfer:0,card:0,sso:0};
   const payCounts={cash:0,transfer:0,card:0,sso:0};
   f.forEach(r=>{
-    const k=r.payment||'cash';
-    if(payTotals[k]===undefined)return;
-    payTotals[k]+=(r.price||r.total||0);
-    payCounts[k]+=1;
+    (r.items||[]).forEach(it=>{
+      const k=it.payment||r.payment||'cash';
+      if(payTotals[k]===undefined)return;
+      const net=Math.max(0,(it.price||0)-(it.discount||0));
+      payTotals[k]+=net;
+      payCounts[k]+=1;
+    });
+    if(!(r.items||[]).length){
+      const k=r.payment||'cash';
+      if(payTotals[k]!==undefined){
+        payTotals[k]+=(r.price||r.total||0);
+        payCounts[k]+=1;
+      }
+    }
   });
   ['cash','transfer','card','sso'].forEach(k=>{
     document.getElementById('dash-pay-'+k).textContent=fp(payTotals[k]);
