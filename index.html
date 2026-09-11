@@ -1485,7 +1485,7 @@ function findVisitById(visitId){
 
 function addVisit(){const name=document.getElementById('f-name').value.trim();if(!name){toast('กรุณากรอกชื่อคนไข้');return;}if(!document.getElementById('f-dentist').value){toast('กรุณาเลือกทันตแพทย์');return;}if(!currentVisitItems.length){toast('กรุณาเพิ่มรายการหัตถการอย่างน้อย 1 รายการ');return;}
   const subtotal=currentVisitItems.reduce((s,it)=>s+(it.price||0),0);
-  const discount=parseFloat(document.getElementById('f-discount').value)||0;
+  const discount=currentVisitItems.reduce((s,it)=>s+(it.discount||0),0);
   const dn=document.getElementById('f-dn').value.trim();
   const pid=document.getElementById('f-pid').value.trim();
   const tel=document.getElementById('f-tel').value.trim();
